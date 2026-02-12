@@ -671,7 +671,7 @@
                 })
                 .map(post => {
                     const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : '');
-                    const imgUrl = rawImgUrl.startsWith('http') ? `/image-proxy?url=${encodeURIComponent(rawImgUrl)}` : rawImgUrl;
+                    const imgUrl = rawImgUrl.startsWith('http') ? `https://wsrv.nl/?url=${encodeURIComponent(rawImgUrl)}&output=jpg` : rawImgUrl;
 
                     return {
                         likes: Number(post.likesCount),

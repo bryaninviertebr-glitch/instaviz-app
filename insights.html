@@ -764,7 +764,7 @@
 
             container.innerHTML = top5.map((post, i) => {
                 const rawImgUrl = post.displayUrl || (post.images && post.images[0]) || '';
-                const imgUrl = rawImgUrl.startsWith('http') ? `/image-proxy?url=${encodeURIComponent(rawImgUrl)}` : rawImgUrl;
+                const imgUrl = rawImgUrl.startsWith('http') ? `https://wsrv.nl/?url=${encodeURIComponent(rawImgUrl)}&output=jpg` : rawImgUrl;
                 const caption = (post.caption || 'Sin descripción').substring(0, 80);
 
                 return `

@@ -237,9 +237,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'post-card';
 
-            // Image handling with Proxy
-            const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : 'placeholder.jpg');
-            const imgUrl = rawImgUrl.startsWith('http') ? `/image-proxy?url=${encodeURIComponent(rawImgUrl)}` : rawImgUrl;
+            // Image handling with Proxy (wsrv.nl)
+            const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : 'https://placehold.co/400x400?text=No+Image');
+            const imgUrl = rawImgUrl.startsWith('http') ? `https://wsrv.nl/?url=${encodeURIComponent(rawImgUrl)}&w=400&output=jpg` : rawImgUrl;
 
             const caption = post.caption || '';
             const likes = post.likesCount || 0;
@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openModal(post) {
         const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : '');
-        const imgUrl = rawImgUrl.startsWith('http') ? `/image-proxy?url=${encodeURIComponent(rawImgUrl)}` : rawImgUrl;
+        const imgUrl = rawImgUrl.startsWith('http') ? `https://wsrv.nl/?url=${encodeURIComponent(rawImgUrl)}&output=jpg` : rawImgUrl;
 
         modalImg.src = imgUrl;
         modalUser.innerText = `@${post.ownerUsername}`;
