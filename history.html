@@ -152,8 +152,8 @@
                     ? new Date(profile.scraped_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                     : '';
 
-                // Profile Pic Proxy (if needed, but usually fine)
-                const profilePic = profile.profile_pic ? `/image-proxy?url=${encodeURIComponent(profile.profile_pic)}` : '';
+                // Profile Pic Proxy (wsrv.nl)
+                const profilePic = profile.profile_pic ? `https://wsrv.nl/?url=${encodeURIComponent(profile.profile_pic)}&w=200&output=jpg` : '';
 
                 return `
           <div class="history-item glass-panel" data-index="${i}" onclick="toggleExpand(this)">
@@ -183,9 +183,9 @@
               ${posts.length > 0 ? `
                 <div class="history-posts-grid">
                   ${posts.map((post, pi) => {
-                    // Image URL logic with proxy
+                    // Image URL logic with proxy (wsrv.nl)
                     const rawUrl = post.display_url || (post.images && post.images[0]) || '';
-                    const imgUrl = rawUrl ? `/image-proxy?url=${encodeURIComponent(rawUrl)}` : '';
+                    const imgUrl = rawUrl ? `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=400&output=jpg` : '';
 
                     return `
                     <div class="history-post-thumb" onclick="event.stopPropagation(); openHistoryPost(${i}, ${pi})">
@@ -218,7 +218,8 @@
             if (!post) return;
 
             const rawUrl = post.display_url || (post.images && post.images[0]) || '';
-            const imgUrl = rawUrl ? `/image-proxy?url=${encodeURIComponent(rawUrl)}` : '';
+            // Use wsrv.nl for modal too, but higher quality or original
+            const imgUrl = rawUrl ? `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&output=jpg` : '';
 
             const modalImg = document.getElementById('modalImage');
             modalImg.src = imgUrl;
