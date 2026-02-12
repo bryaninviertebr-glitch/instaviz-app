@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Test Groups</title>
+    <style>
+        body {
+            background: #0d0d0d;
+            color: #fff;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        #log {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Business Groups Test</h1>
+
+    <div id="groupSelectorContainer" style="border: 2px solid red; padding: 10px; min-height: 50px;">
+        Loading groups...
+    </div>
+
+    <div id="log"></div>
+
+    <script src="business-groups.js"></script>
+    <script>
+        const log = document.getElementById('log');
+        function addLog(msg) {
+            log.textContent += new Date().toLocaleTimeString() + ' | ' + msg + '\n';
+            console.log(msg);
+        }
+
+        addLog('Script started');
+        addLog('BusinessGroups available: ' + !!window.BusinessGroups);
+
+        if (window.BusinessGroups) {
+            addLog('Calling BusinessGroups.init...');
+            BusinessGroups.init('groupSelectorContainer', (groupId) => {
+                addLog('Group changed to: ' + groupId);
+            }).then((config) => {
+                addLog('Init complete! Groups loaded: ' + (config ? config.groups.length : 'null'));
+                if (config && config.groups.length > 0) {
+                    config.groups.forEach(g => {
+                        addLog('  Group: "' + g.name + '" | Accounts: ' + g.accounts.length + ' | ID: ' + g.id);
+                    });
+                }
+                addLog('Container innerHTML length: ' + document.getElementById('groupSelectorContainer').innerHTML.length);
+                addLog('Container innerHTML preview: ' + document.getElementById('groupSelectorContainer').innerHTML.substring(0, 200));
+            }).catch(err => {
+                addLog('ERROR: ' + err.message);
+            });
+        } else {
+            addLog('ERROR: BusinessGroups module not loaded!');
+        }
+    </script>
+</body>
+
+</html>

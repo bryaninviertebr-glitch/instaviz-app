@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Historial de perfiles de Instagram scrapeados con InstaScraping.">
+    <title>InstaScraping — Historial</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <!-- Header -->
+        <header class="glass-panel"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 2rem; margin-bottom: 0; border-bottom: 1px solid rgba(255,255,255,0.05); border-radius: 16px 16px 0 0;">
+            <div class="logo">
+                <h1>Insta<span class="highlight">Viz</span></h1>
+                <p class="subtitle">Historial de Scrapes</p>
+                <p class="branding">by <span class="branding-author">Bryan Orellana</span></p>
+            </div>
+            <div class="controls" style="display: flex; gap: 1rem; align-items: center;">
+                <a href="index.html" class="nav-btn" title="Volver al Dashboard"
+                    style="text-decoration: none; color: white;">🏠 Volver</a>
+            </div>
+        </header>
+
+        <!-- Navigation Bar -->
+        <nav class="nav-bar glass-panel"
+            style="border-top: none; border-radius: 0 0 16px 16px; margin-bottom: 2.5rem; background: rgba(255, 255, 255, 0.03);">
+            <a href="index.html" class="nav-tab">🏠 Inicio</a>
+            <a href="history.html" class="nav-tab active">📜 Historial</a>
+            <a href="scatter.html" class="nav-tab">📊 Engajamento</a>
+            <a href="timeline.html" class="nav-tab">📈 Curtidas</a>
+            <a href="comments-timeline.html" class="nav-tab">💬 Comentários</a>
+            <a href="posts-vs-likes.html" class="nav-tab">📉 Distribuição</a>
+            <a href="insights.html" class="nav-tab">📋 Relatório</a>
+        </nav>
+
+        <!-- History List -->
+        <section id="historySection">
+            <div id="historyList" class="history-list">
+                <!-- Loading placeholder -->
+                <div class="empty-state glass-panel" id="historyLoading">
+                    <div class="loading-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <p class="loading-text">Cargando historial…</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Created by <strong>Bryan Orellana</strong></p>
+            <div class="footer-meta">
+                <span>📸 InstaScraping</span>
+                <span>© 2026</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Post Modal (reused) -->
+    <div id="postModal" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+            <img id="modalImage" class="modal-image" src="" alt="Post detail">
+            <div class="modal-stats">
+                <span id="modalLikes">♥ 0</span>
+                <span id="modalComments">💬 0</span>
+                <span id="modalViews" style="display:none;">▶ 0</span>
+            </div>
+            <div id="modalHashtags" class="modal-hashtags" style="display:none;"></div>
+            <p id="modalCaption" class="modal-caption"></p>
+            <div class="modal-meta">
+                <span id="modalDate"></span>
+                <a id="modalLink" class="modal-link" href="#" target="_blank" rel="noopener">Ver en Instagram →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="instascraping/supabase-client.js"></script>
+
+    <script>
+        // ── History State ──
+        let historyData = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initHistory();
+
+            // Modal close
+            const modal = document.getElementById('postModal');
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeHistoryModal();
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') closeHistoryModal();
+                });
+            }
+        });
+
+        async function initHistory() {
+            const listEl = document.getElementById('historyList');
+            const loadingEl = document.getElementById('historyLoading');
+
+            try {
+                historyData = await loadHistory();
+                if (loadingEl) loadingEl.remove();
+
+                if (historyData.length === 0) {
+                    listEl.innerHTML = `
+            <div class="empty-state glass-panel">
+              <div class="empty-icon">🔍</div>
+              <h3>Sin historial</h3>
+              <p>Aún no has scrapeado ningún perfil. <a href="index.html" style="color:var(--accent-primary);">Empieza ahora →</a></p>
+            </div>
+          `;
+                    return;
+                }
+
+                renderHistory(historyData);
+
+            } catch (err) {
+                console.error('Error loading history:', err);
+                if (loadingEl) loadingEl.remove();
+
+                listEl.innerHTML = `
+          <div class="empty-state glass-panel">
+            <div class="empty-icon">⚠️</div>
+            <h3>Error al cargar</h3>
+            <p>${escapeHtml(err.message)}</p>
+            <p style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);">Verifica la configuración de Supabase en config.js</p>
+          </div>
+        `;
+            }
+        }
+
+        function renderHistory(profiles) {
+            const listEl = document.getElementById('historyList');
+
+            listEl.innerHTML = profiles.map((profile, i) => {
+                const posts = profile.posts || [];
+                const dateStr = profile.scraped_at
+                    ? new Date(profile.scraped_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '';
+
+                // Profile Pic Proxy (if needed, but usually fine)
+                const profilePic = profile.profile_pic ? `/image-proxy?url=${encodeURIComponent(profile.profile_pic)}` : '';
+
+                return `
+          <div class="history-item glass-panel" data-index="${i}" onclick="toggleExpand(this)">
+            <div class="history-header">
+              <img class="history-avatar"
+                   src="${profilePic}"
+                   alt="${profile.username}"
+                   onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23222%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 font-size=%2240%22 fill=%22%23666%22 text-anchor=%22middle%22>📷</text></svg>'">
+              <div class="history-info">
+                <h3>${profile.full_name || profile.username}${profile.is_verified ? ' ✓' : ''}</h3>
+                <p class="history-username">@${profile.username}</p>
+                <p class="history-date">${dateStr}</p>
+              </div>
+              <div class="history-stats-row">
+                <div class="mini-stat">
+                  <div class="mini-val">${formatNum(profile.followers)}</div>
+                  <div class="mini-lbl">Seguidores</div>
+                </div>
+                <div class="mini-stat">
+                  <div class="mini-val">${posts.length}</div>
+                  <div class="mini-lbl">Posts</div>
+                </div>
+              </div>
+              <span class="expand-icon">▼</span>
+            </div>
+            <div class="history-posts">
+              ${posts.length > 0 ? `
+                <div class="history-posts-grid">
+                  ${posts.map((post, pi) => {
+                    // Image URL logic with proxy
+                    const rawUrl = post.display_url || (post.images && post.images[0]) || '';
+                    const imgUrl = rawUrl ? `/image-proxy?url=${encodeURIComponent(rawUrl)}` : '';
+
+                    return `
+                    <div class="history-post-thumb" onclick="event.stopPropagation(); openHistoryPost(${i}, ${pi})">
+                      <img src="${imgUrl}"
+                           alt="Post"
+                           loading="lazy"
+                           onerror="this.onerror=null;this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%231a1a1a%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 font-size=%2230%22 fill=%22%23444%22 text-anchor=%22middle%22>📷</text></svg>'">
+                      <div class="thumb-overlay">
+                        <span>♥ ${formatNum(post.likes_count)}</span>
+                        <span>💬 ${formatNum(post.comments_count)}</span>
+                      </div>
+                    </div>
+                  `}).join('')}
+                </div>
+              ` : '<p style="color:var(--text-muted);font-size:0.85rem;">Sin publicaciones registradas.</p>'}
+            </div>
+          </div>
+        `;
+            }).join('');
+        }
+
+        function toggleExpand(el) {
+            el.classList.toggle('expanded');
+        }
+
+        function openHistoryPost(profileIndex, postIndex) {
+            const profile = historyData[profileIndex];
+            if (!profile) return;
+            const post = profile.posts[postIndex];
+            if (!post) return;
+
+            const rawUrl = post.display_url || (post.images && post.images[0]) || '';
+            const imgUrl = rawUrl ? `/image-proxy?url=${encodeURIComponent(rawUrl)}` : '';
+
+            const modalImg = document.getElementById('modalImage');
+            modalImg.src = imgUrl;
+            modalImg.onerror = function () {
+                this.onerror = null;
+                this.src = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%231a1a1a%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 font-size=%2230%22 fill=%22%23444%22 text-anchor=%22middle%22>📷</text></svg>';
+            };
+
+            document.getElementById('modalLikes').textContent = `♥ ${formatNum(post.likes_count)}`;
+            document.getElementById('modalComments').textContent = `💬 ${formatNum(post.comments_count)}`;
+            document.getElementById('modalCaption').textContent = post.caption || 'Sin leyenda';
+            document.getElementById('modalDate').textContent = post.published_at
+                ? new Date(post.published_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+                : '';
+
+            const linkEl = document.getElementById('modalLink');
+            if (post.post_url) { linkEl.href = post.post_url; linkEl.style.display = 'inline'; }
+            else { linkEl.style.display = 'none'; }
+
+            const hashEl = document.getElementById('modalHashtags');
+            if (post.hashtags && post.hashtags.length > 0) {
+                hashEl.innerHTML = post.hashtags.map(h => `<span class="hashtag-chip">#${h}</span>`).join('');
+                hashEl.style.display = 'flex';
+            } else { hashEl.style.display = 'none'; }
+
+            const viewsEl = document.getElementById('modalViews');
+            if (post.video_views) { viewsEl.textContent = `▶ ${formatNum(post.video_views)} views`; viewsEl.style.display = 'inline'; }
+            else { viewsEl.style.display = 'none'; }
+
+            document.getElementById('postModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('postModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ── Helpers ──
+        function formatNum(n) {
+            if (n == null) return '0';
+            const num = Number(n);
+            if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+            if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
+            return num.toLocaleString();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    </script>
+
+</body>
+
+</html>

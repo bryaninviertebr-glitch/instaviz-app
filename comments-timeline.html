@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise: Evolução de Comentários</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent: #FFFD00;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .chart-section {
+            min-width: 0;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .highlight {
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .stats-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        #commentsPlot {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1rem;
+            min-height: 500px;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 400px;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        /* Sidebar Preview */
+        .preview-sidebar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: sticky;
+            top: 2rem;
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
+        }
+
+        .preview-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            text-align: center;
+        }
+
+        .preview-content {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .preview-content.has-data {
+            text-align: left;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .preview-details {
+            padding: 0.5rem 0;
+        }
+
+        .preview-username {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+        }
+
+        .preview-caption {
+            font-size: 0.9rem;
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+            max-height: 6em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .preview-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .preview-stat {
+            text-align: center;
+        }
+
+        .preview-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.25rem;
+        }
+
+        .preview-stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .preview-link-btn {
+            display: block;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.8rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            color: var(--accent);
+            text-decoration: none;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .preview-link-btn:hover {
+            background: var(--accent);
+            color: #000;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 253, 0, 0.3);
+        }
+
+        /* Filters Panel */
+        .filters-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-input,
+        .filter-select {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 0.7rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .filter-input:focus,
+        .filter-select:focus {
+            border-color: var(--accent);
+        }
+
+        .filter-select option {
+            background: #1a1a1a;
+            color: white;
+        }
+
+        .filter-slider {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .filter-slider::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 253, 0, 0.5);
+            transition: all 0.3s;
+        }
+
+        .filter-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 15px rgba(255, 253, 0, 0.8);
+        }
+
+        .filter-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(255, 253, 0, 0.5);
+        }
+
+        .slider-value {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-top: 0.3rem;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 1rem;
+            grid-column: 1 / -1;
+        }
+
+        .filter-btn {
+            padding: 0.7rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+        }
+
+        .filter-btn.primary {
+            background: var(--accent);
+            color: black;
+        }
+
+        .filter-btn.primary:hover {
+            filter: brightness(0.9);
+            transform: translateY(-2px);
+        }
+
+        .filter-btn.secondary {
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+            border: 1px solid var(--glass-border);
+        }
+
+        .filter-btn.secondary:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--accent);
+            background: var(--glass-bg);
+            transform: translateX(-5px);
+        }
+
+        @media (max-width: 1200px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-sidebar {
+                position: relative;
+                top: 0;
+            }
+        }
+
+        /* Branding Styles */
+        .app-footer {
+            margin-top: 4rem;
+            padding: 2rem;
+            text-align: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+        }
+
+        .footer-branding {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-branding strong {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .footer-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            opacity: 0.6;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .app-footer:hover .footer-branding strong {
+            text-shadow: 0 0 10px var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Voltar ao Painel</a>
+
+        <header>
+            <h1>Evolução Temporal de <span class="highlight">Comentários</span></h1>
+            <p class="subtitle">Histórico de Comentários ao Longo do Tempo</p>
+        </header>
+
+        <!-- Business Group Selector -->
+        <div id="groupSelectorContainer" class="bg-selector-wrapper"></div>
+
+        <!-- Filters Panel -->
+        <div class="filters-panel">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label class="filter-label" for="filterOwner">👤 Conta</label>
+                    <select id="filterOwner" class="filter-select">
+                        <option value="">Todos os usuários</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filterDateFrom">📅 Data Inicial</label>
+                    <input type="date" id="filterDateFrom" class="filter-input">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filterDateTo">📅 Data Final</label>
+                    <input type="date" id="filterDateTo" class="filter-input">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filterTopPercent">🏆 Melhor Desempenho</label>
+                    <input type="range" id="filterTopPercent" class="filter-slider" min="10" max="100" value="100"
+                        step="10">
+                    <div class="slider-value">Top <span id="topPercentValue">100</span>%</div>
+                </div>
+
+                <div class="filter-actions">
+                    <button id="applyFiltersBtn" class="filter-btn primary">Aplicar Filtros</button>
+                    <button id="clearFiltersBtn" class="filter-btn secondary">Limpar</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-panel" id="statsPanel">
+            <div class="loading">Carregando estatísticas...</div>
+        </div>
+
+        <div class="main-layout">
+            <div class="chart-section">
+                <div id="commentsPlot">
+                    <div class="loading">Gerando gráfico histórico...</div>
+                </div>
+            </div>
+
+            <aside class="preview-sidebar">
+                <div class="preview-header">Pré-visualização da Publicação</div>
+                <div class="preview-content" id="previewContent">
+                    <p>Passe o mouse sobre um ponto<br>para ver a pré-visualização</p>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Footer Branding -->
+        <footer class="app-footer">
+            <p class="footer-branding">Created by <strong>Bryan Orellana</strong></p>
+            <div class="footer-meta">
+                <span>📊 Instagram Analytics</span>
+                <span>© 2026</span>
+                <span>v1.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="data-service.js"></script>
+    <script src="business-groups.js"></script>
+    <script>
+        let allPosts = [];
+        let filteredPosts = [];
+
+        function populateOwnerFilter(posts) {
+            const owners = new Set();
+            posts.forEach(post => {
+                const owner = post.ownerUsername || post.ownerFullName;
+                if (owner) owners.add(owner);
+            });
+
+            const select = document.getElementById('filterOwner');
+            select.innerHTML = '<option value="">Todos os usu\u00e1rios</option>';
+            Array.from(owners).sort().forEach(owner => {
+                const option = document.createElement('option');
+                option.value = owner;
+                option.textContent = owner;
+                select.appendChild(option);
+            });
+        }
+
+        function setupFilterListeners() {
+            const slider = document.getElementById('filterTopPercent');
+            const sliderValue = document.getElementById('topPercentValue');
+
+            slider.addEventListener('input', () => {
+                sliderValue.textContent = slider.value;
+            });
+
+            document.getElementById('applyFiltersBtn').addEventListener('click', applyFilters);
+            document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+        }
+
+        function applyFilters() {
+            const owner = document.getElementById('filterOwner').value;
+            const dateFrom = document.getElementById('filterDateFrom').value;
+            const dateTo = document.getElementById('filterDateTo').value;
+            const topPercent = parseInt(document.getElementById('filterTopPercent').value);
+
+            let filtered = [...filteredPosts];
+
+            if (owner) {
+                filtered = filtered.filter(post => {
+                    const postOwner = post.ownerUsername || post.ownerFullName;
+                    return postOwner === owner;
+                });
+            }
+
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                filtered = filtered.filter(post => new Date(post.timestamp) >= fromDate);
+            }
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                filtered = filtered.filter(post => new Date(post.timestamp) <= toDate);
+            }
+
+            if (topPercent < 100) {
+                filtered.sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
+                const cutoff = Math.ceil(filtered.length * (topPercent / 100));
+                filtered = filtered.slice(0, cutoff);
+            }
+
+            filteredPosts = filtered;
+            renderChart(filteredPosts);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterOwner').value = '';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            document.getElementById('filterTopPercent').value = '100';
+            document.getElementById('topPercentValue').textContent = '100';
+
+            filteredPosts = window.BusinessGroups ? BusinessGroups.filterPosts(allPosts) : [...allPosts];
+            populateOwnerFilter(filteredPosts);
+            renderChart(filteredPosts);
+        }
+
+        // Cargar datos desde Supabase
+        DataService.loadAllPosts()
+            .then(async data => {
+                allPosts = data;
+
+                // Init business groups
+                if (window.BusinessGroups) {
+                    await BusinessGroups.init('groupSelectorContainer', () => {
+                        filteredPosts = BusinessGroups.filterPosts(allPosts);
+                        populateOwnerFilter(filteredPosts);
+                        clearFilters();
+                    });
+                    filteredPosts = BusinessGroups.filterPosts(allPosts);
+                } else {
+                    filteredPosts = [...allPosts];
+                }
+
+                populateOwnerFilter(filteredPosts);
+                setupFilterListeners();
+                renderChart(filteredPosts);
+            })
+            .catch(error => {
+                console.error('Error loading data:', error);
+                document.getElementById('commentsPlot').innerHTML = '<div class="loading">Erro ao carregar os dados</div>';
+            });
+
+        function renderChart(posts) {
+            // Filtrar y limpiar datos
+            const cleanData = posts
+                .filter(post => {
+                    const comments = post.commentsCount;
+                    const timestamp = post.timestamp;
+                    return comments != null && timestamp != null &&
+                        !isNaN(comments) && comments >= 0;
+                })
+                .map(post => {
+                    const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : '');
+                    const imgUrl = rawImgUrl.startsWith('http') ? `/image-proxy?url=${encodeURIComponent(rawImgUrl)}` : rawImgUrl;
+
+                    return {
+                        likes: Number(post.likesCount || 0),
+                        comments: Number(post.commentsCount),
+                        timestamp: new Date(post.timestamp), // Parse ISO string directly
+                        username: post.ownerUsername || 'Unknown',
+                        caption: (post.caption || '').substring(0, 150),
+                        url: post.url || '#',
+                        imageUrl: imgUrl
+                    };
+                })
+                .sort((a, b) => a.timestamp - b.timestamp); // Ordenar por fecha
+
+            // Calcular estadísticas
+            const totalPosts = cleanData.length;
+            const avgComments = cleanData.reduce((sum, p) => sum + p.comments, 0) / totalPosts;
+            const maxComments = Math.max(...cleanData.map(p => p.comments));
+            const minComments = Math.min(...cleanData.map(p => p.comments));
+
+            // Calcular tendencia (comentarios promedio en primera mitad vs segunda mitad)
+            const midPoint = Math.floor(totalPosts / 2);
+            const firstHalfAvg = cleanData.slice(0, midPoint).reduce((sum, p) => sum + p.comments, 0) / midPoint;
+            const secondHalfAvg = cleanData.slice(midPoint).reduce((sum, p) => sum + p.comments, 0) / (totalPosts - midPoint);
+            const trend = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg * 100).toFixed(1);
+
+            // Mostrar estadísticas
+            document.getElementById('statsPanel').innerHTML = `
+                    <div class="stat-item">
+                        <div class="stat-label">Publicações Analisadas</div>
+                        <div class="stat-value">${totalPosts.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Média de Comentários</div>
+                        <div class="stat-value">${formatNumber(avgComments)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Máximo de Comentários</div>
+                        <div class="stat-value">${formatNumber(maxComments)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Tendência</div>
+                        <div class="stat-value">${trend > 0 ? '+' : ''}${trend}%</div>
+                    </div>
+                `;
+
+            // Preparar datos para Plotly
+            const trace = {
+                x: cleanData.map(p => p.timestamp),
+                y: cleanData.map(p => p.comments),
+                customdata: cleanData,
+                mode: 'lines+markers',
+                type: 'scatter',
+                name: 'Comentarios',
+                hovertemplate: '<extra></extra>', // Disable default tooltip
+                line: {
+                    color: 'rgba(255, 253, 0, 0.6)',
+                    width: 2,
+                    shape: 'spline'
+                },
+                marker: {
+                    size: 8,
+                    color: cleanData.map(p => p.comments),
+                    colorscale: [
+                        [0, '#4A148C'],
+                        [0.5, '#7B1FA2'],
+                        [1, '#FFFD00']
+                    ],
+                    showscale: true,
+                    colorbar: {
+                        title: 'Comentarios',
+                        titlefont: { color: '#ffffff' },
+                        tickfont: { color: '#a0a0a0' },
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        bordercolor: 'rgba(255, 255, 255, 0.1)',
+                        borderwidth: 1
+                    },
+                    line: {
+                        color: 'rgba(255, 253, 0, 0.3)',
+                        width: 1
+                    }
+                }
+            };
+
+            const layout = {
+                title: {
+                    text: 'Evolução de Comentários ao Longo do Tempo',
+                    font: {
+                        color: '#ffffff',
+                        size: 20
+                    }
+                },
+                xaxis: {
+                    title: {
+                        text: 'Data de Publicação',
+                        font: { color: '#ffffff' }
+                    },
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    color: '#a0a0a0',
+                    type: 'date'
+                },
+                yaxis: {
+                    title: {
+                        text: 'Número de Comentários',
+                        font: { color: '#ffffff' }
+                    },
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    color: '#a0a0a0',
+                    type: 'log'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                hovermode: 'closest',
+                showlegend: false,
+                font: {
+                    family: 'Outfit, sans-serif'
+                }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d']
+            };
+
+            // Renderizar gráfico
+            Plotly.newPlot('commentsPlot', [trace], layout, config);
+
+            // Preview Sidebar Logic
+            const previewContent = document.getElementById('previewContent');
+            const commentsPlot = document.getElementById('commentsPlot');
+
+            commentsPlot.on('plotly_hover', (data) => {
+                const point = data.points[0];
+                const post = point.customdata;
+
+                if (post) {
+                    previewContent.className = 'preview-content active';
+                    previewContent.innerHTML = `
+                        <div class="preview-post">
+                            <img src="${post.imageUrl}" alt="Post" class="preview-image">
+                            <div class="preview-details">
+                                <div class="preview-username">@${post.username}</div>
+                                <div class="preview-caption">${post.caption || 'Sin descripción'}</div>
+                                <div class="preview-stats">
+                                    <div class="preview-stat">
+                                        <div class="preview-stat-label">Likes</div>
+                                        <div class="preview-stat-value">♥ ${formatNumber(post.likes)}</div>
+                                    </div>
+                                    <div class="preview-stat">
+                                        <div class="preview-stat-label">Comments</div>
+                                        <div class="preview-stat-value">💬 ${formatNumber(post.comments)}</div>
+                                    </div>
+                                </div>
+                                <a href="${post.url}" target="_blank" class="preview-link-btn">
+                                    🔗 Ver Publicação no Instagram
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US', {
+                notation: "compact",
+                compactDisplay: "short"
+            }).format(num);
+        }
+    </script>
+</body>
+
+</html>

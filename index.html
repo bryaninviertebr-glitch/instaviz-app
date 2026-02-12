@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Instagram DataViz</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="glass-panel"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 2rem; margin-bottom: 0; border-bottom: 1px solid rgba(255,255,255,0.05); border-radius: 16px 16px 0 0;">
+            <div class="logo">
+                <h1>Insta<span class="highlight">Viz</span></h1>
+                <p class="subtitle">Painel de Dados do Instagram</p>
+                <p class="branding">by <span class="branding-author">Bryan Orellana</span></p>
+            </div>
+            <div class="controls" style="display: flex; gap: 1rem; align-items: center;">
+                <input type="text" id="searchInput" placeholder="Buscar legendas..." style="width: 250px;">
+                <select id="sortSelect">
+                    <option value="date-desc">Mais Recentes</option>
+                    <option value="likes-desc">Mais Curtidas</option>
+                    <option value="comments-desc">Mais Comentários</option>
+                </select>
+                <button id="refreshBtn" class="refresh-btn" title="Atualizar Dados">🔄</button>
+            </div>
+        </header>
+
+        <!-- Navigation Bar -->
+        <nav class="nav-bar glass-panel"
+            style="border-top: none; border-radius: 0 0 16px 16px; margin-bottom: 2.5rem; background: rgba(255, 255, 255, 0.03);">
+            <a href="index.html" class="nav-tab active">🏠 Inicio</a>
+            <a href="history.html" class="nav-tab">📜 Historial</a>
+            <a href="scatter.html" class="nav-tab">📊 Engajamento</a>
+            <a href="timeline.html" class="nav-tab">📈 Curtidas</a>
+            <a href="comments-timeline.html" class="nav-tab">💬 Comentários</a>
+            <a href="posts-vs-likes.html" class="nav-tab">📉 Distribuição</a>
+            <a href="insights.html" class="nav-tab">📋 Relatório</a>
+        </nav>
+
+        <!-- Scrape Form -->
+        <section class="scrape-form-panel glass-panel" style="margin-bottom: 2rem; padding: 1.5rem;">
+            <div class="scrape-header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="color: var(--accent); font-size: 1.1rem; font-weight: 600;">🚀 Nuevo Análisis</h3>
+                <span class="status-badge" id="scrapeStatusBadge" style="display: none;">Wait...</span>
+            </div>
+            <form id="dashboardScrapeForm" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 250px;">
+                    <label for="scrapeProfileUrl"
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; font-weight: 500;">
+                        Perfil de Instagram (URL)
+                    </label>
+                    <input type="url" id="scrapeProfileUrl" placeholder="https://www.instagram.com/usuario" required
+                        style="width: 100%; padding: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 8px; color: white;">
+                </div>
+                <div class="form-group" style="width: 120px;">
+                    <label for="scrapePostsLimit"
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; font-weight: 500;">
+                        Posts
+                    </label>
+                    <input type="number" id="scrapePostsLimit" value="10" min="1" max="50" required
+                        style="width: 100%; padding: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 8px; color: white;">
+                </div>
+                <button type="submit" id="dashboardScrapeBtn" class="filter-btn primary"
+                    style="height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span class="btn-text">Analizar 🔍</span>
+                </button>
+            </form>
+            <div id="scrapeFeedback"
+                style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-secondary); display: none;"></div>
+        </section>
+
+        <!-- Business Group Selector -->
+        <div id="groupSelectorContainer" class="bg-selector-wrapper"></div>
+
+        <!-- Advanced Filters Panel -->
+        <div class="filters-panel glass-panel">
+            <div class="filters-header">
+                <h3>🔍 Filtros Avançados</h3>
+                <button class="toggle-filters-btn" id="toggleFiltersBtn">Mostrar Filtros</button>
+            </div>
+            <div class="filters-content" id="filtersContent">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label>Data Inicial</label>
+                        <input type="date" id="filterDateFrom" placeholder="Data inicial">
+                    </div>
+                    <div class="filter-group">
+                        <label>Data Final</label>
+                        <input type="date" id="filterDateTo" placeholder="Data final">
+                    </div>
+                    <div class="filter-group">
+                        <label>Top % Curtidas: <span id="topLikesLabel">100%</span></label>
+                        <input type="range" id="filterTopLikes" min="10" max="100" value="100" step="10"
+                            class="range-slider">
+                    </div>
+                    <div class="filter-group">
+                        <label>Top % Comentários: <span id="topCommentsLabel">100%</span></label>
+                        <input type="range" id="filterTopComments" min="10" max="100" value="100" step="10"
+                            class="range-slider">
+                    </div>
+                    <div class="filter-group">
+                        <label>Usuário (Conta)</label>
+                        <select id="filterOwner">
+                            <option value="">Todos os usuários</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button class="filter-btn secondary" id="clearFiltersBtn">Limpar Filtros</button>
+                    <button class="filter-btn primary" id="applyFiltersBtn">Aplicar Filtros</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Section -->
+        <section class="kpi-grid">
+            <div class="kpi-card glass-panel">
+                <h3>Total de Publicações</h3>
+                <p class="kpi-value" id="kpi-posts">0</p>
+            </div>
+            <div class="kpi-card glass-panel">
+                <h3>Total de Curtidas</h3>
+                <p class="kpi-value" id="kpi-likes">0</p>
+            </div>
+            <div class="kpi-card glass-panel">
+                <h3>Total de Comentários</h3>
+                <p class="kpi-value" id="kpi-comments">0</p>
+            </div>
+            <div class="kpi-card glass-panel">
+                <h3>Top Hashtag</h3>
+                <p class="kpi-value special" id="kpi-hashtag">-</p>
+            </div>
+        </section>
+
+        <!-- Masonry Grid -->
+        <main id="gallery-grid" class="gallery-grid">
+            <!-- Items injected by JS -->
+            <div class="loading">Carregando dados...</div>
+        </main>
+
+        <!-- Footer Branding -->
+        <footer class="app-footer">
+            <p class="footer-branding">Created by <strong>Bryan Orellana</strong></p>
+            <div class="footer-meta">
+                <span>📊 Instagram Analytics</span>
+                <span>© 2026</span>
+                <span>v1.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal -->
+    <div id="postModal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel">
+            <button class="close-btn">&times;</button>
+            <div class="modal-body">
+                <div class="modal-media">
+                    <img id="modalImg" src="" alt="Post Detail">
+                </div>
+                <div class="modal-info">
+                    <div class="user-info">
+                        <h3 id="modalUser">Usuário</h3>
+                        <span id="modalDate" class="date-badge">Data</span>
+                    </div>
+                    <div class="stats-row">
+                        <span>♥ <b id="modalLikes">0</b></span>
+                        <span>💬 <b id="modalComments">0</b></span>
+                    </div>
+                    <div class="caption-scroll">
+                        <p id="modalCaption">Texto da legenda...</p>
+                    </div>
+                    <a href="#" id="modalLink" target="_blank" class="action-btn">Ver no Instagram</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="data-service.js"></script>
+    <script src="business-groups.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

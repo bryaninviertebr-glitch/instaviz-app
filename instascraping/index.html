@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Scraping de perfiles de Instagram — extrae datos, publicaciones y métricas de cualquier perfil público.">
+    <title>InstaScraping — Scraper de Instagram</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="header glass-panel">
+            <div class="logo">
+                <h1>Insta<span class="highlight">Scraping</span></h1>
+                <p class="subtitle">Extrae datos de Instagram al instante</p>
+                <p class="branding">by <span class="branding-author">Bryan Orellana</span></p>
+            </div>
+            <nav class="nav-links">
+                <a href="index.html" class="nav-btn active">🔍 Scraper</a>
+                <a href="history.html" class="nav-btn">📋 Historial</a>
+            </nav>
+        </header>
+
+        <!-- Scrape Form -->
+        <section class="scrape-section">
+            <form id="scrapeForm" class="scrape-form glass-panel">
+                <h2 class="form-title">🚀 Nuevo Scraping</h2>
+                <p class="form-subtitle">Ingresa la URL del perfil de Instagram y la cantidad de publicaciones a
+                    extraer.</p>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="profileUrl">URL del perfil de Instagram</label>
+                        <input type="url" id="profileUrl" class="form-input"
+                            placeholder="https://www.instagram.com/natgeo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="postsLimit">Publicaciones</label>
+                        <input type="number" id="postsLimit" class="form-input" value="10" min="1" max="100" required>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" id="scrapeBtn" class="btn-scrape">
+                            <span class="spinner"></span>
+                            <span class="btn-text">Scrape 🔍</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loadingOverlay" class="loading-overlay glass-panel">
+            <div class="loading-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <p class="loading-text">Scraping en progreso…</p>
+            <p class="loading-subtext">Esto puede tomar unos segundos dependiendo de la cantidad de publicaciones.</p>
+        </div>
+
+        <!-- Results Section -->
+        <section id="resultsSection" class="results-section">
+
+            <!-- Profile Card -->
+            <div id="profileCard" class="profile-card glass-panel">
+                <!-- Rendered by JS -->
+            </div>
+
+            <!-- Posts Grid -->
+            <div class="posts-section-header">
+                <h2>📸 Publicaciones</h2>
+                <span id="postsCountBadge" class="posts-count-badge">0 publicaciones</span>
+            </div>
+            <div id="postsGrid" class="posts-grid">
+                <!-- Rendered by JS -->
+            </div>
+
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Created by <strong>Bryan Orellana</strong></p>
+            <div class="footer-meta">
+                <span>📸 InstaScraping</span>
+                <span>© 2026</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Post Modal -->
+    <div id="postModal" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img id="modalImage" class="modal-image" src="" alt="Post detail">
+            <div class="modal-stats">
+                <span id="modalLikes">♥ 0</span>
+                <span id="modalComments">💬 0</span>
+                <span id="modalViews" style="display:none;">▶ 0</span>
+            </div>
+            <div id="modalHashtags" class="modal-hashtags" style="display:none;"></div>
+            <p id="modalCaption" class="modal-caption"></p>
+            <div class="modal-meta">
+                <span id="modalDate"></span>
+                <a id="modalLink" class="modal-link" href="#" target="_blank" rel="noopener">Ver en Instagram →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe de Optimización | Instagram Analytics</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent: #FFFD00;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --success: #4CAF50;
+            --warning: #FF9800;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--accent);
+            background: var(--glass-bg);
+            transform: translateX(-5px);
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .highlight {
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Account Selector */
+        .account-selector {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .selector-label {
+            color: var(--accent);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .account-select {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--accent);
+            color: var(--text-primary);
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            outline: none;
+            min-width: 250px;
+            cursor: pointer;
+        }
+
+        .account-select option {
+            background: #1a1a1a;
+            color: white;
+        }
+
+        .filter-info {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+
+        .filter-badge {
+            background: rgba(255, 253, 0, 0.15);
+            color: var(--accent);
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+
+        /* Report Sections */
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .report-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+        }
+
+        .report-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        /* KPI Stats */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        .kpi-item {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .kpi-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Top Posts */
+        .top-posts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .top-post-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            align-items: center;
+        }
+
+        .post-rank {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            min-width: 40px;
+        }
+
+        .post-image {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .post-info {
+            flex: 1;
+        }
+
+        .post-caption {
+            font-size: 0.9rem;
+            color: #ccc;
+            margin-bottom: 0.5rem;
+            max-height: 2.4em;
+            overflow: hidden;
+        }
+
+        .post-stats {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .post-stat {
+            color: var(--accent);
+        }
+
+        /* Recommendations */
+        .recommendations-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .recommendation-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .rec-icon {
+            font-size: 1.5rem;
+        }
+
+        .rec-content {
+            flex: 1;
+        }
+
+        .rec-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .rec-description {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Charts */
+        .chart-container {
+            min-height: 300px;
+        }
+
+        /* Patterns Grid */
+        .patterns-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .pattern-item {
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .pattern-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .pattern-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            color: var(--text-secondary);
+        }
+
+        /* Benchmark */
+        .benchmark-bar {
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .benchmark-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #FFE066);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        .benchmark-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Competitive Analysis */
+        .ranking-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .ranking-table th,
+        .ranking-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .ranking-table th {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ranking-table tr.selected {
+            background: rgba(255, 253, 0, 0.15);
+        }
+
+        .ranking-table tr.selected td {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .rank-badge.gold {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+        }
+
+        .rank-badge.silver {
+            background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
+            color: #000;
+        }
+
+        .rank-badge.bronze {
+            background: linear-gradient(135deg, #CD7F32, #A0522D);
+            color: #fff;
+        }
+
+        .rank-badge.normal {
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+        }
+
+        .competitive-insight {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid;
+        }
+
+        .competitive-insight.positive {
+            border-color: var(--success);
+        }
+
+        .competitive-insight.neutral {
+            border-color: var(--accent);
+        }
+
+        .competitive-insight.negative {
+            border-color: var(--warning);
+        }
+
+        .insight-icon {
+            font-size: 1.5rem;
+        }
+
+        .insight-text {
+            flex: 1;
+        }
+
+        .insight-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .insight-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 900px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .patterns-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .report-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Branding Styles */
+        .app-footer {
+            margin-top: 4rem;
+            padding: 2rem;
+            text-align: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+        }
+
+        .footer-branding {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-branding strong {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .footer-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            opacity: 0.6;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .app-footer:hover .footer-branding strong {
+            text-shadow: 0 0 10px var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Volver al Dashboard</a>
+
+        <header>
+            <h1>Informe de <span class="highlight">Optimización</span></h1>
+            <p class="subtitle">Recomendaciones personalizadas para maximizar el engagement</p>
+        </header>
+
+        <!-- Business Group Selector -->
+        <div id="groupSelectorContainer" class="bg-selector-wrapper"></div>
+
+        <!-- Account Selector -->
+        <div class="account-selector">
+            <span class="selector-label">👤 Selecciona la cuenta a analizar:</span>
+            <select id="accountSelect" class="account-select">
+                <option value="">-- Selecciona una cuenta --</option>
+            </select>
+            <div class="filter-info">
+                Filtros aplicados:
+                <span class="filter-badge">Top 30% Likes</span>
+                <span class="filter-badge">Top 30% Comments</span>
+                <span class="filter-badge">Últimos 90 días</span>
+            </div>
+        </div>
+
+        <!-- Report Content (hidden until account selected) -->
+        <div id="reportContent" style="display: none;">
+            <!-- KPIs Row -->
+            <div class="report-card full-width">
+                <div class="card-header">
+                    <span class="card-icon">📊</span>
+                    <span class="card-title">Resumen Ejecutivo</span>
+                </div>
+                <div class="kpi-grid" id="kpiGrid">
+                    <div class="kpi-item">
+                        <div class="kpi-value" id="kpiPosts">-</div>
+                        <div class="kpi-label">Posts Analizados</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-value" id="kpiAvgLikes">-</div>
+                        <div class="kpi-label">Promedio Likes</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-value" id="kpiAvgComments">-</div>
+                        <div class="kpi-label">Promedio Comments</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-value" id="kpiEngagement">-</div>
+                        <div class="kpi-label">Engagement Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-grid">
+                <!-- Top Posts -->
+                <div class="report-card">
+                    <div class="card-header">
+                        <span class="card-icon">🏆</span>
+                        <span class="card-title">Top 5 Mejores Posts</span>
+                    </div>
+                    <div class="top-posts-list" id="topPostsList">
+                        <div class="loading">Cargando...</div>
+                    </div>
+                </div>
+
+                <!-- Patterns -->
+                <div class="report-card">
+                    <div class="card-header">
+                        <span class="card-icon">📅</span>
+                        <span class="card-title">Patrones Óptimos</span>
+                    </div>
+                    <div class="patterns-grid" id="patternsGrid">
+                        <div class="pattern-item">
+                            <div class="pattern-value" id="bestDay">-</div>
+                            <div class="pattern-label">Mejor Día</div>
+                        </div>
+                        <div class="pattern-item">
+                            <div class="pattern-value" id="bestHour">-</div>
+                            <div class="pattern-label">Mejor Hora</div>
+                        </div>
+                        <div class="pattern-item">
+                            <div class="pattern-value" id="avgCaptionLen">-</div>
+                            <div class="pattern-label">Long. Caption Óptima</div>
+                        </div>
+                        <div class="pattern-item">
+                            <div class="pattern-value" id="postFrequency">-</div>
+                            <div class="pattern-label">Frecuencia Sugerida</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendations -->
+                <div class="report-card full-width">
+                    <div class="card-header">
+                        <span class="card-icon">💡</span>
+                        <span class="card-title">Recomendaciones Personalizadas</span>
+                    </div>
+                    <div class="recommendations-list" id="recommendationsList">
+                        <div class="loading">Cargando...</div>
+                    </div>
+                </div>
+
+                <!-- Benchmark -->
+                <div class="report-card full-width">
+                    <div class="card-header">
+                        <span class="card-icon">🎯</span>
+                        <span class="card-title">Benchmarks vs Promedio General</span>
+                    </div>
+                    <div id="benchmarkContent">
+                        <div class="loading">Cargando...</div>
+                    </div>
+                </div>
+
+                <!-- Competitive Analysis -->
+                <div class="report-card full-width">
+                    <div class="card-header">
+                        <span class="card-icon">🏁</span>
+                        <span class="card-title">Análisis Competitivo vs Otras Cuentas</span>
+                    </div>
+                    <div id="competitiveContent">
+                        <div class="loading">Cargando...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Placeholder when no account selected -->
+        <div id="placeholder" class="report-card" style="text-align: center; padding: 4rem;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">👆</div>
+            <h2 style="color: var(--accent); margin-bottom: 0.5rem;">Selecciona una cuenta</h2>
+            <p style="color: var(--text-secondary);">Elige una cuenta del dropdown para generar el informe de
+                optimización personalizado</p>
+        </div>
+
+        <!-- Footer Branding -->
+        <footer class="app-footer">
+            <p class="footer-branding">Created by <strong>Bryan Orellana</strong></p>
+            <div class="footer-meta">
+                <span>📊 Instagram Analytics</span>
+                <span>© 2026</span>
+                <span>v1.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="data-service.js"></script>
+    <script src="business-groups.js"></script>
+    <script>
+        let allPosts = [];
+        let groupFilteredPosts = [];
+        let globalStats = {};
+        const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+        // Load data from Supabase
+        DataService.loadAllPosts()
+            .then(async data => {
+                allPosts = data;
+
+                // Init business groups
+                if (window.BusinessGroups) {
+                    await BusinessGroups.init('groupSelectorContainer', () => {
+                        groupFilteredPosts = BusinessGroups.filterPosts(allPosts);
+                        // Recalculate global stats for the group
+                        const gLikes = groupFilteredPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / (groupFilteredPosts.length || 1);
+                        const gComments = groupFilteredPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / (groupFilteredPosts.length || 1);
+                        globalStats = { avgLikes: gLikes, avgComments: gComments };
+                        populateAccountSelector(groupFilteredPosts);
+                        // Reset view
+                        document.getElementById('placeholder').style.display = 'block';
+                        document.getElementById('reportContent').style.display = 'none';
+                    });
+                    groupFilteredPosts = BusinessGroups.filterPosts(allPosts);
+                } else {
+                    groupFilteredPosts = [...posts];
+                }
+
+                // Calculate global stats for benchmarks
+                const globalLikes = groupFilteredPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / (groupFilteredPosts.length || 1);
+                const globalComments = groupFilteredPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / (groupFilteredPosts.length || 1);
+                globalStats = { avgLikes: globalLikes, avgComments: globalComments };
+
+                // Populate account selector
+                populateAccountSelector(groupFilteredPosts);
+            })
+            .catch(err => console.error('Error loading data:', err));
+
+        function populateAccountSelector(posts) {
+            const select = document.getElementById('accountSelect');
+            select.innerHTML = '<option value="">-- Selecciona una cuenta --</option>';
+            const owners = new Set();
+            posts.forEach(p => {
+                if (p.ownerUsername) owners.add(p.ownerUsername);
+            });
+
+            Array.from(owners).sort().forEach(owner => {
+                const option = document.createElement('option');
+                option.value = owner;
+                option.textContent = `@${owner}`;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    generateReport(e.target.value);
+                    document.getElementById('placeholder').style.display = 'none';
+                    document.getElementById('reportContent').style.display = 'block';
+                } else {
+                    document.getElementById('placeholder').style.display = 'block';
+                    document.getElementById('reportContent').style.display = 'none';
+                }
+            });
+        }
+
+        function generateReport(owner) {
+            // Filter by owner within group-filtered posts
+            let filtered = (groupFilteredPosts.length ? groupFilteredPosts : allPosts).filter(p => p.ownerUsername === owner);
+
+            // Apply predefined filters: last 90 days
+            const now = new Date();
+            const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            filtered = filtered.filter(p => new Date(p.timestamp) >= ninetyDaysAgo);
+
+            // Apply Top 30% by engagement (likes + comments)
+            filtered.sort((a, b) => {
+                const engA = (a.likesCount || 0) + (a.commentsCount || 0);
+                const engB = (b.likesCount || 0) + (b.commentsCount || 0);
+                return engB - engA;
+            });
+            const cutoff = Math.ceil(filtered.length * 0.3);
+            const topPosts = filtered.slice(0, Math.max(cutoff, 5));
+
+            // Generate all sections
+            renderKPIs(topPosts, filtered);
+            renderTopPosts(topPosts);
+            renderPatterns(topPosts);
+            renderRecommendations(topPosts, filtered);
+            renderBenchmarks(topPosts);
+            renderCompetitiveAnalysis(owner, topPosts);
+        }
+
+        function renderKPIs(topPosts, allFiltered) {
+            const totalPosts = topPosts.length;
+            const avgLikes = topPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / totalPosts;
+            const avgComments = topPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / totalPosts;
+            const engagementRate = ((avgLikes + avgComments) / 1000 * 100).toFixed(1);
+
+            document.getElementById('kpiPosts').textContent = totalPosts;
+            document.getElementById('kpiAvgLikes').textContent = formatNumber(avgLikes);
+            document.getElementById('kpiAvgComments').textContent = formatNumber(avgComments);
+            document.getElementById('kpiEngagement').textContent = engagementRate + '%';
+        }
+
+        function renderTopPosts(topPosts) {
+            const container = document.getElementById('topPostsList');
+            const top5 = topPosts.slice(0, 5);
+
+            container.innerHTML = top5.map((post, i) => {
+                const rawImgUrl = post.displayUrl || (post.images && post.images[0]) || '';
+                const imgUrl = rawImgUrl.startsWith('http') ? `/image-proxy?url=${encodeURIComponent(rawImgUrl)}` : rawImgUrl;
+                const caption = (post.caption || 'Sin descripción').substring(0, 80);
+
+                return `
+                    <div class="top-post-item">
+                        <div class="post-rank">#${i + 1}</div>
+                        <img src="${imgUrl}" class="post-image" alt="Post">
+                        <div class="post-info">
+                            <div class="post-caption">${caption}...</div>
+                            <div class="post-stats">
+                                <span class="post-stat">♥ ${formatNumber(post.likesCount || 0)}</span>
+                                <span class="post-stat">💬 ${formatNumber(post.commentsCount || 0)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPatterns(topPosts) {
+            // Best day
+            const dayCount = {};
+            topPosts.forEach(p => {
+                const day = new Date(p.timestamp).getDay();
+                dayCount[day] = (dayCount[day] || 0) + 1;
+            });
+            const bestDayNum = Object.keys(dayCount).reduce((a, b) => dayCount[a] > dayCount[b] ? a : b, 0);
+            document.getElementById('bestDay').textContent = DAYS[bestDayNum];
+
+            // Best hour
+            const hourCount = {};
+            topPosts.forEach(p => {
+                const hour = new Date(p.timestamp).getHours();
+                hourCount[hour] = (hourCount[hour] || 0) + 1;
+            });
+            const bestHour = Object.keys(hourCount).reduce((a, b) => hourCount[a] > hourCount[b] ? a : b, 12);
+            document.getElementById('bestHour').textContent = `${bestHour}:00`;
+
+            // Average caption length of top posts
+            const avgLen = topPosts.reduce((sum, p) => sum + (p.caption || '').length, 0) / topPosts.length;
+            document.getElementById('avgCaptionLen').textContent = `~${Math.round(avgLen)} chars`;
+
+            // Post frequency
+            if (topPosts.length >= 2) {
+                const dates = topPosts.map(p => new Date(p.timestamp)).sort((a, b) => a - b);
+                const avgDays = (dates[dates.length - 1] - dates[0]) / (1000 * 60 * 60 * 24) / topPosts.length;
+                document.getElementById('postFrequency').textContent = `${Math.round(avgDays)} días`;
+            } else {
+                document.getElementById('postFrequency').textContent = 'N/A';
+            }
+        }
+
+        function renderRecommendations(topPosts, allFiltered) {
+            const recommendations = [];
+
+            // Best day recommendation
+            const dayCount = {};
+            topPosts.forEach(p => {
+                const day = new Date(p.timestamp).getDay();
+                dayCount[day] = (dayCount[day] || 0) + 1;
+            });
+            const bestDayNum = Object.keys(dayCount).reduce((a, b) => dayCount[a] > dayCount[b] ? a : b, 0);
+            recommendations.push({
+                icon: '📅',
+                title: `Publica los ${DAYS[bestDayNum]}`,
+                desc: `El ${DAYS[bestDayNum]} tiene el mejor rendimiento con ${dayCount[bestDayNum]} de tus top posts.`
+            });
+
+            // Best hour recommendation
+            const hourCount = {};
+            topPosts.forEach(p => {
+                const hour = new Date(p.timestamp).getHours();
+                hourCount[hour] = (hourCount[hour] || 0) + 1;
+            });
+            const bestHour = Object.keys(hourCount).reduce((a, b) => hourCount[a] > hourCount[b] ? a : b, 12);
+            recommendations.push({
+                icon: '⏰',
+                title: `Hora óptima: ${bestHour}:00`,
+                desc: `Tus posts con mejor rendimiento fueron publicados alrededor de las ${bestHour}:00.`
+            });
+
+            // Caption length
+            const avgLen = topPosts.reduce((sum, p) => sum + (p.caption || '').length, 0) / topPosts.length;
+            if (avgLen > 150) {
+                recommendations.push({
+                    icon: '✍️',
+                    title: 'Captions extensos funcionan',
+                    desc: `Tu audiencia responde bien a captions de ~${Math.round(avgLen)} caracteres. Mantén el contenido detallado.`
+                });
+            } else {
+                recommendations.push({
+                    icon: '✍️',
+                    title: 'Captions concisos funcionan',
+                    desc: `Tu audiencia prefiere captions cortos (~${Math.round(avgLen)} chars). Mantén los mensajes directos.`
+                });
+            }
+
+            // Engagement pattern
+            const avgLikes = topPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / topPosts.length;
+            const avgComments = topPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / topPosts.length;
+
+            if (avgComments / avgLikes > 0.05) {
+                recommendations.push({
+                    icon: '💬',
+                    title: 'Alto engagement en comentarios',
+                    desc: 'Tu contenido genera conversación. Continúa haciendo preguntas y fomentando la participación.'
+                });
+            } else {
+                recommendations.push({
+                    icon: '💬',
+                    title: 'Oportunidad: más comentarios',
+                    desc: 'Considera añadir CTAs, preguntas o polls para aumentar la interacción en comentarios.'
+                });
+            }
+
+            // Frequency
+            recommendations.push({
+                icon: '📊',
+                title: 'Mantén la consistencia',
+                desc: `Basado en tu top content, publica contenido de alta calidad cada 3-5 días para mantener el engagement.`
+            });
+
+            const container = document.getElementById('recommendationsList');
+            container.innerHTML = recommendations.map(rec => `
+                <div class="recommendation-item">
+                    <span class="rec-icon">${rec.icon}</span>
+                    <div class="rec-content">
+                        <div class="rec-title">${rec.title}</div>
+                        <div class="rec-description">${rec.desc}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderBenchmarks(topPosts) {
+            const avgLikes = topPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / topPosts.length;
+            const avgComments = topPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / topPosts.length;
+
+            const likesVsGlobal = (avgLikes / globalStats.avgLikes * 100).toFixed(0);
+            const commentsVsGlobal = (avgComments / globalStats.avgComments * 100).toFixed(0);
+
+            const container = document.getElementById('benchmarkContent');
+            container.innerHTML = `
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Likes vs Promedio General</span>
+                        <span style="color: var(--accent); font-weight: 600;">${likesVsGlobal}%</span>
+                    </div>
+                    <div class="benchmark-bar">
+                        <div class="benchmark-fill" style="width: ${Math.min(likesVsGlobal, 200)}%;"></div>
+                    </div>
+                    <div class="benchmark-labels">
+                        <span>0%</span>
+                        <span>100% (promedio)</span>
+                        <span>200%+</span>
+                    </div>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Comments vs Promedio General</span>
+                        <span style="color: var(--accent); font-weight: 600;">${commentsVsGlobal}%</span>
+                    </div>
+                    <div class="benchmark-bar">
+                        <div class="benchmark-fill" style="width: ${Math.min(commentsVsGlobal, 200)}%;"></div>
+                    </div>
+                    <div class="benchmark-labels">
+                        <span>0%</span>
+                        <span>100% (promedio)</span>
+                        <span>200%+</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US', {
+                notation: "compact",
+                compactDisplay: "short"
+            }).format(num);
+        }
+
+        function renderCompetitiveAnalysis(selectedOwner, selectedTopPosts) {
+            // Calculate stats for all accounts
+            const accountStats = {};
+            const owners = new Set();
+
+            allPosts.forEach(post => {
+                const owner = post.ownerUsername;
+                if (!owner) return;
+                owners.add(owner);
+
+                if (!accountStats[owner]) {
+                    accountStats[owner] = { likes: 0, comments: 0, posts: 0 };
+                }
+                accountStats[owner].likes += post.likesCount || 0;
+                accountStats[owner].comments += post.commentsCount || 0;
+                accountStats[owner].posts += 1;
+            });
+
+            // Calculate averages and scores
+            const rankings = Object.keys(accountStats).map(owner => {
+                const stats = accountStats[owner];
+                const avgLikes = stats.likes / stats.posts;
+                const avgComments = stats.comments / stats.posts;
+                const score = avgLikes + (avgComments * 10); // Weight comments higher
+                return { owner, avgLikes, avgComments, posts: stats.posts, score };
+            });
+
+            // Sort by score
+            rankings.sort((a, b) => b.score - a.score);
+
+            // Find selected account position
+            const selectedRank = rankings.findIndex(r => r.owner === selectedOwner) + 1;
+            const selectedStats = rankings.find(r => r.owner === selectedOwner);
+            const topAccount = rankings[0];
+            const totalAccounts = rankings.length;
+
+            // Generate ranking table HTML
+            const tableHTML = `
+                <h4 style="margin-bottom: 1rem; color: var(--text-secondary);">Ranking de Cuentas</h4>
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th>Pos</th>
+                            <th>Cuenta</th>
+                            <th>Avg Likes</th>
+                            <th>Avg Comments</th>
+                            <th>Posts</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rankings.slice(0, 10).map((r, i) => {
+                const isSelected = r.owner === selectedOwner;
+                const badgeClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal';
+                return `
+                                <tr class="${isSelected ? 'selected' : ''}">
+                                    <td><span class="rank-badge ${badgeClass}">${i + 1}</span></td>
+                                    <td>@${r.owner} ${isSelected ? '👈' : ''}</td>
+                                    <td>${formatNumber(r.avgLikes)}</td>
+                                    <td>${formatNumber(r.avgComments)}</td>
+                                    <td>${r.posts}</td>
+                                </tr>
+                            `;
+            }).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            // Generate competitive insights
+            const insights = [];
+
+            // Position insight
+            const percentile = Math.round((1 - (selectedRank / totalAccounts)) * 100);
+            if (percentile >= 75) {
+                insights.push({
+                    type: 'positive',
+                    icon: '🏆',
+                    title: `Estás en el Top ${100 - percentile}%`,
+                    desc: `Tu cuenta @${selectedOwner} ocupa la posición #${selectedRank} de ${totalAccounts} cuentas.`
+                });
+            } else if (percentile >= 50) {
+                insights.push({
+                    type: 'neutral',
+                    icon: '📊',
+                    title: `Posición #${selectedRank} de ${totalAccounts}`,
+                    desc: `Estás en el percentil ${percentile}. Oportunidad de mejora para alcanzar el top.`
+                });
+            } else {
+                insights.push({
+                    type: 'negative',
+                    icon: '📈',
+                    title: `Oportunidad de crecimiento`,
+                    desc: `Tu cuenta está en posición #${selectedRank}. Analiza las estrategias de las cuentas top.`
+                });
+            }
+
+            // Compare with top account
+            if (selectedOwner !== topAccount.owner) {
+                const likesDiff = ((topAccount.avgLikes / selectedStats.avgLikes) * 100 - 100).toFixed(0);
+                const commentsDiff = ((topAccount.avgComments / selectedStats.avgComments) * 100 - 100).toFixed(0);
+
+                insights.push({
+                    type: 'neutral',
+                    icon: '🎯',
+                    title: `@${topAccount.owner} lidera el ranking`,
+                    desc: `Tiene ${likesDiff}% más likes y ${commentsDiff}% más comentarios en promedio.`
+                });
+            } else {
+                insights.push({
+                    type: 'positive',
+                    icon: '👑',
+                    title: '¡Eres el líder!',
+                    desc: 'Tu cuenta tiene el mejor rendimiento entre todas las cuentas analizadas.'
+                });
+            }
+
+            // Best metric insight
+            const likesRank = [...rankings].sort((a, b) => b.avgLikes - a.avgLikes).findIndex(r => r.owner === selectedOwner) + 1;
+            const commentsRank = [...rankings].sort((a, b) => b.avgComments - a.avgComments).findIndex(r => r.owner === selectedOwner) + 1;
+
+            if (commentsRank < likesRank) {
+                insights.push({
+                    type: 'positive',
+                    icon: '💬',
+                    title: 'Fuerte en comentarios',
+                    desc: `Tu ranking en comentarios (#${commentsRank}) es mejor que en likes (#${likesRank}). Tu contenido genera conversación.`
+                });
+            } else if (likesRank < commentsRank) {
+                insights.push({
+                    type: 'neutral',
+                    icon: '❤️',
+                    title: 'Fuerte en likes',
+                    desc: `Tu ranking en likes (#${likesRank}) es mejor que en comentarios (#${commentsRank}). Considera añadir más CTAs.`
+                });
+            }
+
+            const insightsHTML = `
+                <h4 style="margin: 1.5rem 0 1rem; color: var(--text-secondary);">Insights Competitivos</h4>
+                ${insights.map(insight => `
+                    <div class="competitive-insight ${insight.type}">
+                        <span class="insight-icon">${insight.icon}</span>
+                        <div class="insight-text">
+                            <div class="insight-title">${insight.title}</div>
+                            <div class="insight-desc">${insight.desc}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+
+            document.getElementById('competitiveContent').innerHTML = tableHTML + insightsHTML;
+        }
+    </script>
+</body>
+
+</html>

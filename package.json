@@ -1,0 +1,13 @@
+{
+    "name": "instaviz-app",
+    "version": "1.0.0",
+    "description": "Instagram Analytics Dashboard with Supabase Integration",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {},
+    "engines": {
+        "node": "18.x"
+    }
+}
