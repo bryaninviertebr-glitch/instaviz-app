@@ -36,12 +36,19 @@ async function handleScrape(e) {
     const limitInput = document.getElementById('postsLimit');
     const btn = document.getElementById('scrapeBtn');
 
-    const profileUrl = urlInput.value.trim();
+    let profileUrl = urlInput.value.trim();
     const postsLimit = parseInt(limitInput.value) || 10;
+
+    // Auto-normalizar: acepta username solo, @username o URL completa
+    if (profileUrl && !profileUrl.startsWith('http')) {
+        profileUrl = profileUrl.replace(/^@/, '').replace(/\/$/, '');
+        profileUrl = `https://www.instagram.com/${profileUrl}`;
+        urlInput.value = profileUrl;
+    }
 
     // Validación frontend
     if (!profileUrl) {
-        showToast('Ingresa una URL de Instagram', 'error');
+        showToast('Ingresa una URL o username de Instagram', 'error');
         urlInput.focus();
         return;
     }
@@ -264,9 +271,25 @@ function closeModal() {
 }
 
 // ── UI Helpers ──
+let _loadingTimer = null;
+
 function showLoading(show) {
     const el = document.getElementById('loadingOverlay');
+    const subtext = document.getElementById('loadingSubtext');
     if (el) el.classList.toggle('active', show);
+
+    if (show) {
+        let secs = 0;
+        if (subtext) subtext.textContent = 'Procesando... 0s';
+        _loadingTimer = setInterval(() => {
+            secs++;
+            if (subtext) subtext.textContent = `Procesando... ${secs}s`;
+        }, 1000);
+    } else {
+        clearInterval(_loadingTimer);
+        _loadingTimer = null;
+        if (subtext) subtext.textContent = 'Esto puede tomar unos segundos dependiendo de la cantidad de publicaciones.';
+    }
 }
 
 function hideResults() {

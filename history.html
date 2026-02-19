@@ -88,6 +88,32 @@
     <script src="config.js"></script>
     <script src="instascraping/supabase-client.js"></script>
 
+    <style>
+        .btn-rescrape {
+            padding: 6px 14px;
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 9999px;
+            color: #667eea;
+            font-size: 0.78rem;
+            font-family: 'Outfit', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            margin-left: 8px;
+        }
+
+        .btn-rescrape:hover:not(:disabled) {
+            background: rgba(102, 126, 234, 0.28);
+            border-color: rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-rescrape:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+
     <script>
         // ── History State ──
         let historyData = [];
@@ -148,9 +174,7 @@
 
             listEl.innerHTML = profiles.map((profile, i) => {
                 const posts = profile.posts || [];
-                const dateStr = profile.scraped_at
-                    ? new Date(profile.scraped_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                    : '';
+                const dateStr = timeAgo(profile.scraped_at);
 
                 // Profile Pic Proxy (wsrv.nl)
                 const profilePic = profile.profile_pic ? `https://wsrv.nl/?url=${encodeURIComponent(profile.profile_pic)}&w=200&output=jpg` : '';
@@ -177,6 +201,7 @@
                   <div class="mini-lbl">Posts</div>
                 </div>
               </div>
+              <button class="btn-rescrape" onclick="event.stopPropagation(); reScrape('${profile.ig_url || `https://www.instagram.com/${profile.username}`}', this)">🔄 Actualizar</button>
               <span class="expand-icon">▼</span>
             </div>
             <div class="history-posts">
@@ -258,7 +283,45 @@
             document.body.style.overflow = '';
         }
 
+        // ── Re-Scrape ──
+        async function reScrape(igUrl, btn) {
+            const original = btn.textContent;
+            btn.textContent = '⏳ Scraping...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(CONFIG.WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profileUrl: igUrl, postsLimit: 20 })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    btn.textContent = '✅ Actualizado';
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    btn.textContent = '❌ Error';
+                    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+                }
+            } catch {
+                btn.textContent = '❌ Sin conexión';
+                setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+            }
+        }
+
         // ── Helpers ──
+        function timeAgo(dateStr) {
+            if (!dateStr) return '';
+            const diff = Date.now() - new Date(dateStr).getTime();
+            const mins = Math.floor(diff / 60000);
+            const hours = Math.floor(mins / 60);
+            const days = Math.floor(hours / 24);
+            if (days > 0) return `Hace ${days} día${days > 1 ? 's' : ''}`;
+            if (hours > 0) return `Hace ${hours}h`;
+            if (mins > 0) return `Hace ${mins}min`;
+            return 'Ahora mismo';
+        }
+
         function formatNum(n) {
             if (n == null) return '0';
             const num = Number(n);

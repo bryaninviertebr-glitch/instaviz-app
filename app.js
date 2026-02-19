@@ -237,9 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'post-card';
 
-            // Image handling with Proxy (wsrv.nl)
-            const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : 'https://placehold.co/400x400?text=No+Image');
-            const imgUrl = rawImgUrl.startsWith('http') ? `https://wsrv.nl/?url=${encodeURIComponent(rawImgUrl)}&w=400&output=jpg` : rawImgUrl;
+            // Image handling: proxy via wsrv.nl + onerror fallback
+            const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : '');
+            const imgUrl = proxyImg(rawImgUrl);
+            const imgFallback = `this.onerror=null; this.src=''; this.parentElement.classList.add('no-image'); this.style.display='none';`;
 
             const caption = post.caption || '';
             const likes = post.likesCount || 0;
@@ -247,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.innerHTML = `
                 <div class="card-img-container">
-                    <img src="${imgUrl}" alt="Post" class="card-img" loading="lazy">
+                    ${imgUrl ? `<img src="${imgUrl}" alt="Post" class="card-img" loading="lazy" onerror="${imgFallback}">` : ''}
                     <div class="card-overlay">
                         <span>♥ ${formatNumber(likes)}</span>
                         <span>💬 ${formatNumber(comments)}</span>
@@ -271,9 +272,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openModal(post) {
         const rawImgUrl = post.displayUrl || (post.images && post.images.length > 0 ? post.images[0] : '');
-        const imgUrl = rawImgUrl.startsWith('http') ? `https://wsrv.nl/?url=${encodeURIComponent(rawImgUrl)}&output=jpg` : rawImgUrl;
+        const imgUrl = proxyImg(rawImgUrl);
 
-        modalImg.src = imgUrl;
+        modalImg.src = imgUrl || '';
+        modalImg.style.display = imgUrl ? '' : 'none';
+        modalImg.onerror = () => { modalImg.style.display = 'none'; };
         modalUser.innerText = `@${post.ownerUsername}`;
         modalLikes.innerText = formatNumber(post.likesCount || 0);
         modalComments.innerText = formatNumber(post.commentsCount || 0);
@@ -424,6 +427,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Utilities
+    function proxyImg(url) {
+        if (!url || !url.startsWith('http')) return '';
+        return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&output=jpg`;
+    }
+
     function formatNumber(num) {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
     }
