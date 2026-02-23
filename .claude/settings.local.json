@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill:*)",
+      "Bash(echo:*)",
+      "Bash(cmd.exe /c \"taskkill /F /IM node.exe\")",
+      "Bash(cmd.exe /c \"netstat -ano | findstr :3000\")",
+      "Bash(node:*)",
+      "Bash(cmd.exe /c \"netstat -ano | findstr LISTEN | findstr :3000\")",
+      "Bash(powershell -Command:*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:apify.com)"
+    ]
+  }
+}
