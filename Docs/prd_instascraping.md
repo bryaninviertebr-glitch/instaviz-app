@@ -3,18 +3,18 @@
 **InstaViz (Instagram Analytics Dashboard)** es una aplicación web de uso interno diseñada para agencias de marketing B2B. Su principal objetivo es la **prospección de clientes y auditoría de competidores**, permitiendo hacer scraping de perfiles de Instagram y analizar métricas de rendimiento con un diseño altamente visual.
 
 La división de responsabilidades es la siguiente:
-- **Frontend InstaViz (Local / Antigravity)** → Interfaz de usuario construida en HTML, CSS y Vanilla JS (con bibliotecas visuales como Plotly). Actúa como un CRM ligero y visualizador de datos directamente conectado a **Supabase**.
+- **Frontend InstaViz** → Interfaz de usuario construida en HTML, CSS y Vanilla JS (con bibliotecas visuales como Plotly y html2pdf). Actúa como un CRM ligero, visualizador de datos y generador de reportes conectado a **Supabase**.
 - **Orquestador (n8n)** → Recibe webhooks del frontend, ejecuta el scraping asíncrono/síncrono, guarda los resultados en **Supabase** y devuelve la confirmación.
-- **Motor de Scraping (Apify)** → Ejecuta el Actor oficial para extraer data pura de perfiles comerciales.
+- **Motor de Scraping (Apify)** → Ejecuta el Actor oficial (`apify/instagram-scraper`) para extraer data pura de perfiles comerciales.
 
 ---
 
 ## 2. Problema que resuelve (Caso de Uso Agencia B2B)
 
-- **Auditoría Express para Prospectos:** Generar reportes visuales del estado del Instagram de un cliente potencial en segundos para respaldar propuestas comerciales.
+- **Auditoría Express para Prospectos:** Generación de reportes PDF profesionales listos para enviar a clientes potenciales, resumiendo el estado de su Instagram.
 - **Benchmarking Competitivo:** Analizar los líderes de nicho para encontrar patrones de contenido ganador (Formatos, Frecuencia, Engagement Rate).
-- **Control de Costos:** Al usar caché dinámico en Supabase, los perfiles consultados repetidamente en 24 horas no consumen créditos de la API de Apify.
-- **Gestión Visual (CRM de Contenidos):** Etiquetar cuentas investigadas mediante "Grupos de Negocio" (Ej. 'Clientes', 'Competencia', 'Prospectos') para seguimientos ágiles.
+- **Control de Costos:** Al usar la base de datos como caché principal en Supabase, los perfiles consultados repetidamente no consumen créditos de la API de Apify.
+- **Gestión Visual (CRM de Contenidos):** Clasificación de cuentas investigadas mediante "Grupos de Negocio" (Ej. 'Clientes', 'Competencia', 'Prospectos') gestionados en tiempo real.
 
 ---
 
@@ -22,13 +22,13 @@ La división de responsabilidades es la siguiente:
 
 | Capa | Tecnología | Propósito |
 | --- | --- | --- |
-| **Frontend UI** | HTML5, CSS3, Vanilla JS, Plotly.js | Renderizado rápido, gráficos interactivos, filtros y gestión de CRM. |
-| **Backend Local** | Node.js (`server.js`) | Actúa como middleware local para operaciones bloqueadas por CORS, descargas de imágenes y operaciones sensibles en DB. |
-| **Integración DB (Frontend)** | `@supabase/supabase-js` (CDN) | Lectura directa en tiempo real del historial y datos analíticos. |
-| **Integración DB (Backend)** | `@supabase/supabase-js` (Node) | Uso de `SERVICE_ROLE_KEY` para operaciones privilegiadas (Borrado en cascada, subida a Storage). |
+| **Frontend UI** | HTML5, CSS3, Vanilla JS, Plotly.js, html2pdf.js | Renderizado rápido, gráficos interactivos, filtros, gestión de CRM y exportación a PDF. |
+| **Backend / Proxy** | Node.js (`server.js`), Express | Actúa como middleware local, gestiona el archivo `business-groups.json` y sirve como endpoint de eliminación en base de datos. Sirve localmente sobre Vercel. |
+| **Integración DB (Frontend)** | `@supabase/supabase-js` (CDN) | Lectura directa del historial, perfiles y datos analíticos. |
+| **Proxy de Imágenes** | `wsrv.nl` | Bypass avanzado de las restricciones CORS y expiración de CDN de Meta/Instagram para que las imágenes nunca dejen de cargar. |
 | **Orquestación** | n8n (Webhook) | Valida schemas y realiza los upserts a base de datos protegiendo credenciales sensibles. |
-| **Scraping** | Apify API v2 | Actor oficial: `apify/instagram-scraper` |
-| **Base de datos / Storage** | Supabase (PostgreSQL) | Almacenamiento relacional de `profiles`, `posts`, y Bucket `instaviz-media` para imágenes. |
+| **Scraping** | Apify API v2 | Actor oficial: `apify/instagram-scraper`. |
+| **Base de datos** | Supabase (PostgreSQL) | Almacenamiento relacional de `profiles` y `posts`. |
 
 ---
 
@@ -36,21 +36,21 @@ La división de responsabilidades es la siguiente:
 
 ```mermaid
 flowchart TD
-    subgraph InstaViz["Frontend InstaViz (Local)"]
+    subgraph InstaViz["Frontend InstaViz & Reports"]
         A["Input: URL + N° posts"]
         H["Renderizar Dashboard & Gráficos"]
         I["Consultas Analíticas de Lectura"]
-        J["Acciones UI (Sync/Delete)"]
+        J["Generación de PDF Reportes"]
+        W["Proxy Inyección (wsrv.nl)"]
     end
 
-    subgraph NodeBackend["Backend Local (Node.js - server.js)"]
-        K["/api/sync-images"]
-        L["/api/delete-account"]
-        M["/api/delete-post"]
+    subgraph NodeBackend["Backend Local / Vercel Edge (server.js)"]
+        K["/api/groups (CRUD de grupos)"]
+        L["/api/delete-profile"]
     end
 
     subgraph n8n["n8n (Backend Extractor)"]
-        B["Webhook: POST /scrape"]
+        B["Webhook: POST /webhook/scrape"]
         C["Validar & Sanitizar"]
         D["Nodo Apify: Run Actor"]
         E["Nodo Supabase: Bulk Upsert"]
@@ -58,101 +58,83 @@ flowchart TD
 
     subgraph Supabase["Supabase"]
         DB[("PostgreSQL")]
-        S[("Storage Bucket")]
     end
 
     A -->|"1. POST request"| B
     B --> C --> D --> E -->|"Upsert Data"| DB
-    E -->|"Confirmación"| H
-    I -->|"Lee historial"| DB
-    J -->|"Fetch a Endpoints"| NodeBackend
-    K -->|"Descarga IG CDN y sube"| S
-    L -->|"Borra posts y perfil (Service Key)"| DB
-    M -->|"Borra post específico (Service Key)"| DB
+    H -->|"Procesa URLs de imagen"| W
+    W -->|"Petición proxificada"| H
+    I -->|"Lee historial y posts"| DB
+    J -->|"Genera blob y descarga PDF"| H
+    K <-->|"Lee/Escribe business-groups.json"| NodeBackend
+    L -->|"Borra perfil y cascadea posts"| DB
 ```
 
 ---
 
-## 5. Diseño de Base de Datos (PostgreSQL)
+## 5. Diseño de Base de Datos (PostgreSQL en Supabase)
 
 > [!NOTE]
-> **Estado:** La base de datos, tablas, índices y políticas de RLS ya se encuentran operativas en Supabase. El frontend lee directamente de ellas.
+> **Estado:** La base de datos, tablas, índices y RLS ya se encuentran operativas. El frontend lee con Anon Key y n8n usa Service Role Key.
 
 ### 5.1 Tabla `profiles`
 Contiene la radiografía del usuario scrapeado.
-- Restricciones: `followers >= 0`, `following >= 0`, `CHECK (ig_url ~ '^https?://')`.
-- Columnas Clave: `username` (UNIQUE), `full_name`, `biography`, `followers`, `is_verified`, `profile_pic`.
+- Columnas Clave: `id`, `username` (UNIQUE), `full_name`, `biography`, `followers`, `following`, `is_verified`, `profile_pic`, `external_url`, `ig_url`, `scraped_at`.
 
 ### 5.2 Tabla `posts`
-Contiene el detalle granular de las publicaciones para analizar engagement.
-- Restricciones: Borrado en cascada `ON DELETE CASCADE` si un perfil se elimina.
-- Validaciones: `type IN ('Image', 'Video', 'Sidecar')`.
-- Columnas Clave: `ig_post_id` (UNIQUE), `caption`, `likes_count`, `comments_count`, `video_views`, `hashtags` (Array), `published_at`.
+Contiene el detalle granular de las publicaciones vinculadas a cada perfil.
+- Relación: `profile_username` apunta a `profiles.username` con `ON DELETE CASCADE`.
+- Columnas Clave: `id`, `ig_post_id` (UNIQUE), `type` (Image/Video/Sidecar), `caption`, `likes_count`, `comments_count`, `video_views`, `media_url` (o display_url), `thumbnail_url`, `published_at`, `scraped_at`.
 
 ---
 
-## 6. Lógica de Endpoints en Servidor Local (`server.js`)
+## 6. Lógica de Endpoints en Servidor (`server.js`)
 
-Se ha implementado un servidor Node.js que maneja rutas API utilizando la política de máxima prevención de errores con `SERVICE_ROLE_KEY`.
+Se ha implementado un servidor Node.js que maneja el almacenamiento persistente local y peticiones de eliminación seguras. Está optimizado para funcionar sin problemas en entornos Serverless como Vercel y locales.
 
-### 6.1 Sincronizador de Imágenes
-- **Endpoint:** `POST /api/sync-images?username=xxx`
-- **Función:** Soluciona el problema de las imágenes de Instagram que expiran. 
-- **Flujo:** Descarga la imagen en ArrayBuffer desde el CDN inestable, la sube al bucket público `instaviz-media` con `upsert: true` (para no duplicar), y actualiza el campo de la base de datos con la nueva URL permalink. Tiene control de concurrencia (`activeSyncs`) para evitar dobles peticiones.
-- **Feedback:** Integrado con el endpoint de estado `GET /api/sync-status` para visualización de progreso real en el frontend mediante *polling*.
+### 6.1 Gestión de Grupos de Negocio
+- **Endpoints:** `GET /api/groups`, `POST /api/groups`, `PUT /api/groups/:id`, `DELETE /api/groups/:id`
+- **Función:** Almacena localmente las categorías de CRM (`business-groups.json`), permitiendo colores personalizados y etiquetado masivo.
 
-### 6.2 Gestión y Limpieza de Historial
-- **Endpoint 1:** `DELETE /api/delete-account`
-  - **Función:** Elimina el rastreo total de una cuenta auditada. Para evitar rupturas de Claves Foráneas (FK), ejecuta primero el borrado de todos los Posts vinculados y luego elimina el Profile de la DB.
-- **Endpoint 2:** `DELETE /api/delete-post`
-  - **Función:** Elimina publicaciones aisladas de un perfil específico (limpieza granular de outliers).
+### 6.2 Eliminación de Perfiles
+- **Endpoint:** `DELETE /api/delete-profile`
+- **Función:** Elimina el rastreo total de una cuenta auditada desde Supabase usando el Service Role Key. Elimina automáticamente de forma segura todos sus posts en base a la restricción en cascada.
 
 ---
 
 ## 7. Funcionalidades del Frontend (InstaViz)
 
-La interfaz se divide en múltiples módulos orientados al análisis técnico de la cuenta.
+La interfaz se divide en 3 módulos principales:
 
-| Módulo | Funcionalidad para la Agencia |
+| Módulo | Funcionalidad Core |
 | --- | --- |
-| **Inicio (Dashboard)** | KPIs de alto nivel (Total Likes, Posts). Formulario modal para Scraping de n8n. |
-| **Historial (CRM)** | Tabla interactiva que centraliza todos los perfiles (`history.html`).<br><br>👉 **Nuevas integraciones:**<br>1. Botón de **"💽 Guardar Fotos"** para disparar sincronizador de Supabase Storage.<br>2. Botones de borrado para cada cuenta y para cada publicación específica, vinculados a modales de confirmación JS y eliminación estática por DOM (sin refrescar página). |
-| **Proposal Generator** | Vista `report.html`. Dedicada a condensar las analíticas de un perfil y compilar visualmente los gráficos para ser volcados a un archivo PDF (vía `html2pdf.js`) entregable y firmado. |
-| **Engajamento & Timelines** | Gráficos Scatter Plot y Líneas en el Historial para estudiar tendencias históricas de likes y detectar Viral Outliers. |
+| **1. Dashboard (`index.html`)** | - Input dual (Usuario + Cantidad de Posts max 100).<br>- KPIs de alto nivel (Total Likes, Posts, Media de Seguidores).<br>- Cuadrícula de últimos posts analizados integrando el `wsrv.nl` proxy cache para evitar imágenes rotas.<br>- Gráficos principales con Plotly. |
+| **2. CRM Historial (`history.html`)** | - Tabla interactiva que centraliza todos los perfiles scrapeados.<br>- Selector de "Grupos de Negocio" como etiquetas (píldoras de colores).<br>- Botón rápido de reporte para saltar a la vista detallada.<br>- Integración fluida del borrado asíncrono. |
+| **3. Generador de Pdfs (`report.html`)** | - Recibe por querystring `?username=xxx`.<br>- Pinta una hoja estilo A4 con la radiografía del perfil, sus "Top 3 Posts" y gráficos dedicados.<br>- Invoca el motor `html2pdf.js` para previsualizar y desencadenar descarga PDF de reporte de auditoría completo. |
 
 ---
 
-## 8. Funciones Clave a Implementar (Roadmap de Prospección)
+## 8. Soluciones Técnicas Clave Implementadas
 
-Para potenciar InstaViz como herramienta de cierre de ventas, se prioriza el siguiente desarrollo:
+### A. Proxy Dinámico de Imágenes (Evitar 403 Forbidden)
+Las URLs de imágenes de Instagram caducan y bloquean CORS. El Frontend re-procesa dinámicamente cada URL de imagen interceptando `app.js` y `report.js` a través del servicio proxy público `wsrv.nl`. Si este falla, implementa un fallback a un SVG visual ("Image Unavailable") para garantizar que la UI nunca se vea rota.
 
-### 1. Sistema de Calificación de Perfil (Profile Health Score)
-- **Concepto:** Pasar los datos del perfil (bio, hashtags, ratio de engagement) por una lógica automatizada que devuelva una nota entre 0 y 100 y detecte errores críticos.
-- **Accionable de Venta:** *"Tu biografía no tiene enlace de captura y tu ratio de engagement es del 0.5%. Nuestra agencia puede subir ese Score a 80/100."*
+### B. Bulk Upsert Híbrido en n8n
+El flujo de n8n maneja dos "ramas" condicionales usando el nodo Switch:
+- Actualización de perfil (`Format A` en Apify).
+- Inserción y actualización masiva de posts (`Format B` en Apify).
 
-### 2. "Competitor Duel" (Comparativa Cara a Cara)
-- **Concepto:** Una vista que reciba el ID de 2 perfiles de Supabase y genere gráficos emparejados (Bar Charts) comparando quién gana en volumen, alcance y eficacia de hashtags.
-- **Accionable de Venta:** Demostrar estadísticamente por qué el competidor del prospecto se está llevando la cuota de mercado.
-
-### 3. Generador de Propuesta PDF (Exportación "Proposal-Ready")
-- **Concepto:** Incorporar una librería Frontend (ej. `html2pdf.js` o API remota externa) que tome los gráficos de InstaViz, les añada el logo de tu agencia, y genere un PDF de auditoría elegante de una sola página.
-- **Accionable de Venta:** Envío de correos en frío masivos adjuntando la auditoría personalizada generada automáticamente tras hacer el scraping.
+### C. Fallback Visual y Animación DOM
+Se optimizaron todas las tarjetas visuales (posts y filas de historia) para utilizar Glassmorphism. Las interacciones de eliminación no recargan la página; ejecutan la API en silent failover ocultando mediante CSS transitions el nodo del DOM tras éxito, manteniendo la memoria baja sin re-renderizar la grilla de Plotly.
 
 ---
 
-## 9. Seguridad, Despliegue y Variables de Entorno
+## 9. Variables de Entorno y Despliegue
 
-### Entorno Frontend (InstaViz local):
-El frontend requiere acceso a la Base de datos mediante la Clave Pública de Supabase (Anon Key).
-- **Variables Críticas (en `config.js`):**
+- **Frontend Variables (en `config.js`):**
     - `SUPABASE_URL` y `SUPABASE_ANON_KEY`: Proveen acceso delegado. Si se requiere RLS (Row Level Security), la UI solo tendrá permisos de `SELECT`.
     - `WEBHOOK_URL`: Apuntando a n8n para gatillar scraping en caliente.
-
-### Backend Node.js (`server.js`)
-Para ejecutar tareas bloqueadas por RLS o prohibidas por seguridad web, se debe cargar desde las variables de un archivo `.env`:
-- `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: Proveen acceso total como administrador. Este servidor ejecuta las lógicas de guardado de imágenes en Buckets y las ejecuciones duras de `DELETE FROM DB`.
-
-### Interfaz UI Modales y Manejo de DOM
-- Se ha estructurado la UI del CRM (History) para ejecutar operaciones crudas sin afectar la fluidez:
-  - Funciones como `confirmDeleteAccount()` inyectan un Modal z-index alto.
-  - Tras invocar el fetch AJAX (DELETE), la función `executeDelete()` atrapa el nodo padre del HTML de dicha tarjeta (`btn.closest('.profile-item')`) o de la foto específica (`btn.closest('.post-card')`) y le aplica una animación descendente (`opacity: 0`). Segundos después la remueve del DOM; eliminando la necesidad de una petición pesada para recargar toda la tabla de Supabase y manteniendo la RAM limpia y fluida.
+- **Backend Node.js (`server.js` | `.env`):**
+    - `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: Permisos administrativos para borrados en red.
+- **Despliegue:** 
+    - Listo para configurarse como un proyecto estático en Vercel, ejecutando \`npm start\` con motor Node habilitado.
