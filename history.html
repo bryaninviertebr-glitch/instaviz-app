@@ -83,6 +83,22 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-content glass-panel" style="max-width:420px; text-align:center; padding: 2rem;">
+            <div style="font-size:2.8rem; margin-bottom:0.75rem;">🗑️</div>
+            <h3 id="deleteModalTitle" style="margin-bottom:0.5rem; font-size:1.2rem;"></h3>
+            <p id="deleteModalBody"
+                style="color:var(--text-muted); font-size:0.88rem; line-height:1.6; margin: 0.75rem 0 1.5rem;"></p>
+            <div style="display:flex; gap:0.75rem; justify-content:center;">
+                <button id="deleteModalCancel" class="btn-rescrape" style="color:var(--text-muted); padding:8px 20px;"
+                    onclick="closeDeleteModal()">Cancelar</button>
+                <button id="deleteModalConfirm" class="btn-rescrape btn-delete-confirm" onclick="executeDelete()">🗑️
+                    Confirmar borrado</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
@@ -112,6 +128,89 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        .btn-report {
+            background: rgba(0, 200, 83, 0.12);
+            border-color: rgba(0, 200, 83, 0.35);
+            color: #00c853;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .btn-report:hover {
+            background: rgba(0, 200, 83, 0.25);
+            border-color: rgba(0, 200, 83, 0.6);
+        }
+
+        /* ── Delete Buttons ── */
+        .btn-delete-account {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .btn-delete-account:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.6);
+        }
+
+        .btn-delete-confirm {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.12);
+            padding: 8px 20px;
+        }
+
+        .btn-delete-confirm:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.28);
+            border-color: rgba(239, 68, 68, 0.7);
+        }
+
+        .btn-delete-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Delete button on post thumbnails */
+        .btn-delete-post {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 22px;
+            height: 22px;
+            background: rgba(239, 68, 68, 0.88);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.15s;
+            z-index: 20;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .history-post-thumb:hover .btn-delete-post {
+            opacity: 1;
+        }
+
+        .btn-delete-post:hover {
+            transform: scale(1.15);
+            background: #ef4444;
+        }
+
+        /* Fade-out animation on delete */
+        .deleting {
+            opacity: 0 !important;
+            transform: scale(0.9) !important;
+            transition: opacity 0.3s ease, transform 0.3s ease !important;
+        }
     </style>
 
     <script>
@@ -121,16 +220,28 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await initHistory();
 
-            // Modal close
+            // Post modal close
             const modal = document.getElementById('postModal');
             if (modal) {
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) closeHistoryModal();
                 });
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') closeHistoryModal();
+            }
+
+            // Delete modal close on backdrop click
+            const deleteModal = document.getElementById('deleteModal');
+            if (deleteModal) {
+                deleteModal.addEventListener('click', (e) => {
+                    if (e.target === deleteModal) closeDeleteModal();
                 });
             }
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeHistoryModal();
+                    closeDeleteModal();
+                }
+            });
         });
 
         async function initHistory() {
@@ -201,7 +312,10 @@
                   <div class="mini-lbl">Posts</div>
                 </div>
               </div>
+              <a class="btn-rescrape btn-report" href="report.html?username=${profile.username}" onclick="event.stopPropagation()">📄 Reporte</a>
               <button class="btn-rescrape" onclick="event.stopPropagation(); reScrape('${profile.ig_url || `https://www.instagram.com/${profile.username}`}', this)">🔄 Actualizar</button>
+              <button class="btn-rescrape" style="color:#00bcd4; border-color:rgba(0,188,212,0.3); background:rgba(0,188,212,0.1);" onclick="event.stopPropagation(); syncImages('${profile.username}', this)">💽 Guardar Fotos</button>
+              <button class="btn-rescrape btn-delete-account" onclick="event.stopPropagation(); confirmDeleteAccount('${profile.username}', ${posts.length}, this)">🗑️ Borrar</button>
               <span class="expand-icon">▼</span>
             </div>
             <div class="history-posts">
@@ -222,6 +336,7 @@
                         <span>♥ ${formatNum(post.likes_count)}</span>
                         <span>💬 ${formatNum(post.comments_count)}</span>
                       </div>
+                      <button class="btn-delete-post" onclick="event.stopPropagation(); confirmDeletePost(${i}, ${pi}, this)" title="Borrar post">×</button>
                     </div>
                   `}).join('')}
                 </div>
@@ -306,6 +421,203 @@
             } catch {
                 btn.textContent = '❌ Sin conexión';
                 setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+            }
+        }
+
+        // ── Sincronizar Imágenes Locales ──
+        async function syncImages(username, btn) {
+            const original = btn.textContent;
+            btn.textContent = '⏳ Iniciando...';
+            btn.disabled = true;
+
+            let res, data;
+            try {
+                res = await fetch(`/api/sync-images?username=${encodeURIComponent(username)}`, { method: 'POST' });
+                data = await res.json();
+            } catch (err) {
+                console.error('[Sync] Error de red:', err);
+                btn.textContent = '❌ Sin respuesta del servidor';
+                setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+                return;
+            }
+
+            if (!data.success) {
+                btn.textContent = '❌ Error: ' + (data.error || 'Desconocido');
+                setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 4000);
+                return;
+            }
+
+            if (data.alreadyRunning) {
+                btn.textContent = '🔄 Ya está sincronizando...';
+                setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+                return;
+            }
+
+            // Sync started — poll for status
+            btn.textContent = '⟳ Procesando fotos...';
+
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`/api/sync-status?username=${encodeURIComponent(username)}`);
+                    // If server is old and returns 404, it won't be JSON — handle safely
+                    if (!statusRes.ok) {
+                        // Old server — just show spinner, don't crash
+                        btn.textContent = '⟳ Procesando fotos...';
+                        return;
+                    }
+
+                    const status = await statusRes.json();
+
+                    if (!status.active) {
+                        clearInterval(pollInterval);
+                        if (status.phase === 'Completado') {
+                            btn.textContent = `✅ ${status.done} fotos guardadas`;
+                        } else {
+                            btn.textContent = '✅ Proceso finalizado';
+                        }
+                        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 5000);
+                    } else {
+                        const total = status.total > 0 ? `/${status.total}` : '';
+                        btn.textContent = `⬆️ ${status.phase}: ${status.done}${total}`;
+                    }
+                } catch (e) {
+                    // Network error on poll — keep spinner, don't reset
+                    btn.textContent = '⟳ Procesando fotos...';
+                }
+            }, 2500);
+
+            // Safety timeout: restore button after 5 minutes max
+            setTimeout(() => {
+                clearInterval(pollInterval);
+                if (btn.disabled) {
+                    btn.textContent = original;
+                    btn.disabled = false;
+                }
+            }, 5 * 60 * 1000);
+        }
+
+        // ── Delete Functions ──
+        let pendingDelete = null;
+
+        function confirmDeleteAccount(username, postCount, btn) {
+            pendingDelete = { type: 'account', username, btn };
+            document.getElementById('deleteModalTitle').textContent = `¿Borrar @${username}?`;
+            document.getElementById('deleteModalBody').innerHTML =
+                `Se eliminarán <strong>${postCount} post${postCount !== 1 ? 's' : ''}</strong> y todos los datos de este perfil.<br>
+                 <span style="color:#ef4444; font-weight:600;">Esta acción no se puede deshacer.</span>`;
+            const confirmBtn = document.getElementById('deleteModalConfirm');
+            confirmBtn.textContent = '🗑️ Confirmar borrado';
+            confirmBtn.disabled = false;
+            document.getElementById('deleteModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function confirmDeletePost(profileIndex, postIndex, btn) {
+            pendingDelete = { type: 'post', profileIndex, postIndex, btn };
+            document.getElementById('deleteModalTitle').textContent = '¿Borrar este post?';
+            document.getElementById('deleteModalBody').innerHTML =
+                `El post será eliminado permanentemente de la base de datos.<br>
+                 <span style="color:#ef4444; font-weight:600;">Esta acción no se puede deshacer.</span>`;
+            const confirmBtn = document.getElementById('deleteModalConfirm');
+            confirmBtn.textContent = '🗑️ Confirmar borrado';
+            confirmBtn.disabled = false;
+            document.getElementById('deleteModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDeleteModal() {
+            pendingDelete = null;
+            document.getElementById('deleteModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        async function executeDelete() {
+            if (!pendingDelete) return;
+
+            const confirmBtn = document.getElementById('deleteModalConfirm');
+            confirmBtn.textContent = '⏳ Borrando...';
+            confirmBtn.disabled = true;
+
+            try {
+                if (pendingDelete.type === 'account') {
+                    const { username, btn } = pendingDelete;
+                    const res = await fetch('/api/delete-account', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username })
+                    });
+
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        try {
+                            const data = JSON.parse(errorText);
+                            throw new Error(data.error || `HTTP Error ${res.status}`);
+                        } catch {
+                            throw new Error(`HTTP Error ${res.status}: ${errorText.substring(0, 50)}`);
+                        }
+                    }
+
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+                    // Remove profile card from DOM with animation
+                    const card = btn ? btn.closest('.history-item') : null;
+                    closeDeleteModal();
+
+                    if (card) {
+                        card.style.transition = 'opacity 0.3s, transform 0.3s';
+                        card.style.opacity = '0';
+                        card.style.transform = 'scale(0.95)';
+                        setTimeout(() => card.remove(), 320);
+                    }
+
+                } else if (pendingDelete.type === 'post') {
+                    const { profileIndex, postIndex, btn } = pendingDelete;
+                    const profile = historyData[profileIndex];
+                    const post = profile && profile.posts ? profile.posts[postIndex] : null;
+                    if (!post || !post.id) throw new Error('Post no encontrado en el historial');
+
+                    const res = await fetch('/api/delete-post', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ postId: post.id })
+                    });
+
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        try {
+                            const data = JSON.parse(errorText);
+                            throw new Error(data.error || `HTTP Error ${res.status}`);
+                        } catch {
+                            throw new Error(`HTTP Error ${res.status}: ${errorText.substring(0, 50)}`);
+                        }
+                    }
+
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+                    // Remove from state
+                    historyData[profileIndex].posts.splice(postIndex, 1);
+
+                    // Remove thumbnail from DOM with animation
+                    const thumb = btn ? btn.closest('.history-post-thumb') : null;
+                    closeDeleteModal();
+
+                    if (thumb) {
+                        thumb.style.transition = 'opacity 0.3s, transform 0.3s';
+                        thumb.style.opacity = '0';
+                        thumb.style.transform = 'scale(0.8)';
+                        setTimeout(() => thumb.remove(), 320);
+                    }
+                }
+
+            } catch (err) {
+                console.error('[Delete] Error:', err);
+                confirmBtn.textContent = '❌ ' + err.message;
+                confirmBtn.disabled = false;
+                setTimeout(() => {
+                    confirmBtn.textContent = '🗑️ Confirmar borrado';
+                }, 3500);
             }
         }
 

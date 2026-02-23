@@ -824,6 +824,53 @@ select:focus {
     overflow: hidden;
 }
 
+/* ── Delete Confirmation Modal Override ── */
+#deleteModal.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+#deleteModal.modal-overlay.active {
+    display: flex;
+}
+
+#deleteModal .modal-content {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    max-height: unset;
+    overflow: visible;
+    background: #161616;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+}
+
+.btn-delete-confirm {
+    color: #ff5252 !important;
+    border-color: rgba(255, 82, 82, 0.4) !important;
+    background: rgba(255, 82, 82, 0.12) !important;
+    font-weight: 600;
+}
+
+.btn-delete-confirm:hover {
+    background: rgba(255, 82, 82, 0.25) !important;
+    border-color: #ff5252 !important;
+}
+
+
 .close-btn {
     position: absolute;
     top: 10px;
@@ -1032,4 +1079,103 @@ select:focus {
 /* Animación sutil para el footer */
 .app-footer:hover .footer-branding strong {
     text-shadow: 0 0 10px var(--accent);
+}
+
+/* ── Print / PDF Media Queries ─────────────────────────────── */
+@media print {
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    body {
+        background: #ffffff !important;
+        color: #111111 !important;
+    }
+
+    /* Ocultar elementos de navegación */
+    header,
+    .nav-bar,
+    .app-footer,
+    #btnPdf,
+    .btn-rescrape,
+    .report-header {
+        display: none !important;
+    }
+
+    /* Contenedores de páginas */
+    .app-container,
+    .report-container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Glassmorphism → fondo papel */
+    .glass-panel,
+    .chart-card,
+    .score-card,
+    .profile-card,
+    .top-posts-card,
+    .kpi-mini {
+        background: #f7f7f7 !important;
+        border: 1px solid #cccccc !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Texto legible en papel */
+    h1,
+    h2,
+    h3,
+    h4 {
+        color: #111 !important;
+    }
+
+    p,
+    span,
+    div {
+        color: #333 !important;
+    }
+
+    .text-secondary,
+    .text-muted,
+    .score-breakdown h3,
+    .chart-card h3,
+    .pstat-lbl,
+    .kpi-mini-lbl {
+        color: #555 !important;
+    }
+
+    /* Evitar cortes en secciones clave */
+    .profile-card,
+    .score-card,
+    .kpi-row,
+    .charts-grid,
+    .chart-card,
+    .top-posts-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    /* Salto de página antes de los gráficos */
+    .charts-grid {
+        page-break-before: auto;
+    }
+
+    /* Colores de accent para impresión */
+    .highlight,
+    .kpi-mini-val,
+    .score-number {
+        color: #333 !important;
+    }
+
+    .score-item-val.pass {
+        color: #008c3a !important;
+    }
+
+    .score-item-val.fail {
+        color: #cc0000 !important;
+    }
 }

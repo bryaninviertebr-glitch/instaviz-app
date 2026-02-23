@@ -429,6 +429,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Utilities
     function proxyImg(url) {
         if (!url || !url.startsWith('http')) return '';
+        // Skip proxy for URLs already on Supabase Storage (permanent, no CORS issues)
+        if (url.includes('supabase.co/storage')) return url;
         return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&output=jpg`;
     }
 

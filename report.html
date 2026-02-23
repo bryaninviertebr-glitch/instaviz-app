@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoría de Perfil — InstaScraping</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ── Report-specific overrides ── */
+        body {
+            background: #0d0d0d;
+        }
+
+        .report-container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ── Report Header ── */
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.2rem 2rem;
+            margin-bottom: 2rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+        }
+
+        .report-header .logo h1 {
+            font-size: 1.4rem;
+        }
+
+        .back-link {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--accent); }
+
+        /* ── Profile Card ── */
+        .profile-card {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            padding: 2rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+        }
+
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--accent);
+            flex-shrink: 0;
+        }
+
+        .profile-avatar-placeholder {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            border: 3px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            flex-shrink: 0;
+        }
+
+        .profile-info { flex: 1; }
+
+        .profile-info h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .profile-info .username {
+            color: var(--accent);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .profile-info .bio {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 12px;
+            max-width: 480px;
+        }
+
+        .profile-stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .pstat { text-align: center; }
+
+        .pstat-val {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .pstat-lbl {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Health Score ── */
+        .score-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+            padding: 2rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+        }
+
+        .score-circle-wrap { text-align: center; flex-shrink: 0; }
+
+        .score-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid var(--accent);
+            background: rgba(255, 253, 0, 0.06);
+            margin: 0 auto 6px;
+        }
+
+        .score-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .score-max {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .score-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .score-breakdown { flex: 1; }
+
+        .score-breakdown h3 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.82rem;
+        }
+
+        .score-item-icon { font-size: 1rem; }
+        .score-item-text { flex: 1; color: var(--text-secondary); }
+        .score-item-val { font-weight: 600; color: white; }
+        .score-item-val.pass { color: var(--success); }
+        .score-item-val.fail { color: var(--error); }
+
+        /* ── Charts Section ── */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            padding: 1.5rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+        }
+
+        .chart-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+        }
+
+        .chart-plot { width: 100%; height: 260px; }
+
+        /* ── Top Posts ── */
+        .top-posts-card {
+            padding: 1.5rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+        }
+
+        .top-posts-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+        }
+
+        .top-posts-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .top-post-thumb {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .top-post-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .top-post-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.75);
+            font-size: 0.65rem;
+            padding: 4px 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ── KPI Row ── */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-mini {
+            padding: 1.2rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .kpi-mini-val {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .kpi-mini-lbl {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        /* ── Loading / Error ── */
+        .report-loading {
+            text-align: center;
+            padding: 6rem 2rem;
+        }
+
+        /* ── Floating PDF Button ── */
+        #btnPdf {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--accent);
+            color: black;
+            border: none;
+            padding: 0.9rem 1.6rem;
+            border-radius: 9999px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(255, 253, 0, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+            display: none;
+        }
+
+        #btnPdf:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 28px rgba(255, 253, 0, 0.55);
+        }
+
+        #btnPdf:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── Group Badge ── */
+        .group-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(255, 253, 0, 0.12);
+            border: 1px solid rgba(255, 253, 0, 0.35);
+            color: var(--accent);
+            white-space: nowrap;
+        }
+
+        .group-badge--none {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* ── KPI delta tags ── */
+        .kpi-delta {
+            font-size: 0.68rem;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .delta-up { color: #00c853; }
+        .delta-down { color: #ff5252; }
+
+        /* ── Print / PDF Styles ── */
+        @media print {
+            body { background: #fff !important; color: #111 !important; }
+            .report-header, #btnPdf { display: none !important; }
+            .report-container { max-width: 100%; padding: 0; }
+            .profile-card, .score-card, .chart-card, .top-posts-card, .kpi-mini {
+                background: #f8f8f8 !important;
+                border: 1px solid #ddd !important;
+                break-inside: avoid;
+            }
+            .charts-grid { break-inside: avoid; page-break-inside: avoid; }
+            .kpi-row { break-inside: avoid; }
+            .score-number, .kpi-mini-val { color: #222 !important; }
+            .profile-info h2, .score-item-val { color: #111 !important; }
+            .profile-info .username { color: #444 !important; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="report-container">
+
+        <!-- Minimal Header -->
+        <header class="report-header">
+            <div class="logo">
+                <h1>Insta<span class="highlight">Viz</span> <span style="font-weight:300;font-size:1rem;color:var(--text-secondary)">Auditoría</span></h1>
+            </div>
+            <a href="history.html" class="back-link">← Volver al Historial</a>
+        </header>
+
+        <!-- Dynamic content injected here -->
+        <div id="reportRoot">
+            <div class="report-loading">
+                <div class="loading-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <p class="loading-text" style="margin-top:1rem;color:var(--text-secondary);">Cargando perfil…</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Floating PDF Button -->
+    <button id="btnPdf" onclick="downloadPdf()">📄 Descargar PDF</button>
+
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="config.js"></script>
+    <script src="data-service.js"></script>
+    <script src="business-groups.js"></script>
+    <script src="report.js"></script>
+</body>
+
+</html>
