@@ -215,7 +215,10 @@ function buildReportHtml(profile, posts, metrics, score, profileGroup, benchmark
         : `<div class="profile-avatar-placeholder">👤</div>`;
 
     const bio = profile.biography || profile.bio || '';
+    const bioHtml = bio ? `<p class="profile-bio">${escapeHtml(bio).replace(/\\n/g, '<br>')}</p>` : '';
+
     const website = profile.external_url || profile.website || '';
+    const websiteHtml = website ? `<a href="${website}" target="_blank" class="profile-link">🔗 ${escapeHtml(website.replace(/^https?:\/\//, ''))}</a>` : '';
 
     const scoreColor = score.total >= 70 ? '#00c853' : score.total >= 45 ? '#fffd00' : '#ff5252';
     const scoreLabel = score.total >= 70 ? 'Excelente' : score.total >= 45 ? 'Regular' : 'Débil';
@@ -276,7 +279,7 @@ function buildReportHtml(profile, posts, metrics, score, profileGroup, benchmark
         </div>
     </div>
 
-    <!-- KPI Row -->
+    <!--KPI Row-- >
     <div class="kpi-row">
         <div class="kpi-mini">
             <div class="kpi-mini-val">${metrics.engagementRate !== null ? metrics.engagementRate.toFixed(2) + '%' : 'N/A'}</div>
@@ -300,7 +303,7 @@ function buildReportHtml(profile, posts, metrics, score, profileGroup, benchmark
         </div>
     </div>
 
-    <!-- Health Score -->
+    <!--Health Score-- >
     <div class="score-card">
         <div class="score-circle-wrap">
             <div class="score-circle" style="border-color:${scoreColor};background:${scoreColor}11">
@@ -320,7 +323,7 @@ function buildReportHtml(profile, posts, metrics, score, profileGroup, benchmark
         </div>
     </div>
 
-    <!-- Charts -->
+    <!--Charts -->
     <div class="charts-grid">
         <div class="chart-card">
             <h3>Formatos de Contenido</h3>
@@ -332,13 +335,13 @@ function buildReportHtml(profile, posts, metrics, score, profileGroup, benchmark
         </div>
     </div>
 
-    <!-- Top Posts -->
-    <div class="top-posts-card">
-        <h3>Top 5 Posts por Likes</h3>
-        <div class="top-posts-grid">
-            ${topPostsHtml || '<p style="color:var(--text-muted);font-size:0.85rem;">Sin posts disponibles.</p>'}
+    <!--Top Posts-- >
+        <div class="top-posts-card">
+            <h3>Top 5 Posts por Likes</h3>
+            <div class="top-posts-grid">
+                ${topPostsHtml || '<p style="color:var(--text-muted);font-size:0.85rem;">Sin posts disponibles.</p>'}
+            </div>
         </div>
-    </div>
     `;
 }
 
@@ -412,7 +415,7 @@ function renderBenchmarkBar(metrics, benchmarks, username) {
 
     Plotly.newPlot('chartMain', [
         {
-            name: `@${username}`,
+            name: `@${username} `,
             type: 'bar',
             x: categories,
             y: profileVals,
@@ -422,7 +425,7 @@ function renderBenchmarkBar(metrics, benchmarks, username) {
             textfont: { color: '#FFFD00', size: 11 }
         },
         {
-            name: `Nicho (${benchmarks.peerCount} cuentas)`,
+            name: `Nicho(${benchmarks.peerCount} cuentas)`,
             type: 'bar',
             x: categories,
             y: benchVals,
@@ -453,7 +456,7 @@ function renderScatter(posts) {
         const d = p.timestamp
             ? new Date(p.timestamp).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
             : '';
-        return `${p.type || 'Post'} · ${d}`;
+        return `${p.type || 'Post'} · ${d} `;
     });
 
     Plotly.newPlot('chartMain', [{
@@ -492,7 +495,7 @@ async function downloadPdf() {
 
     const options = {
         margin: [8, 8, 8, 8],
-        filename: `auditoria-${username}-${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `auditoria - ${username} -${new Date().toISOString().slice(0, 10)}.pdf`,
         image: { type: 'jpeg', quality: 0.96 },
         html2canvas: {
             scale: 2,
@@ -521,10 +524,10 @@ async function downloadPdf() {
 
 function errorHtml(title, detail) {
     return `
-    <div class="empty-state glass-panel" style="margin-top:2rem">
+        < div class="empty-state glass-panel" style = "margin-top:2rem" >
         <div class="empty-icon">⚠️</div>
         <h3>${escapeHtml(title)}</h3>
         <p>${escapeHtml(detail)}</p>
         <p style="margin-top:1rem"><a href="history.html" style="color:var(--accent)">← Volver al Historial</a></p>
-    </div>`;
+    </div > `;
 }
