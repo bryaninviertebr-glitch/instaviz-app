@@ -390,52 +390,122 @@ const requestHandler = (req, res) => {
 
                 console.log(`[Scrape] Iniciando scraping para @${username} (límite: ${postsLimit} posts)`);
 
-                // 2.1 Init Apify client and run actor
-                const { ApifyClient } = require('apify-client');
-                const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
+                // Dispara el run de Apify de forma asíncrona y regresa inmediatamente.
+                // El browser hará polling a /api/fetch-run hasta que el run termine.
+                // Así cada función de Vercel vive < 5s — compatible con el plan Hobby.
+                console.log(`[Scrape] Iniciando run asíncrono en Apify...`);
+                const startRes = await fetch(
+                    'https://api.apify.com/v2/acts/apify~instagram-post-scraper/runs',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${process.env.APIFY_TOKEN}`
+                        },
+                        body: JSON.stringify({ username: [username], resultsLimit: postsLimit })
+                    }
+                );
 
-                // instagram-post-scraper uses 'username' (not 'usernames'), no resultsType
-                const input = {
-                    username: [username],
-                    resultsLimit: postsLimit
-                };
+                if (!startRes.ok) {
+                    const errBody = await startRes.text();
+                    throw new Error(`Apify start error ${startRes.status}: ${errBody.slice(0, 300)}`);
+                }
 
-                // 2.2 Execute and await completion
-                console.log(`[Scrape] Esperando respuesta de Apify...`);
-                const run = await apifyClient.actor('apify/instagram-post-scraper').call(input);
+                const { data: runData } = await startRes.json();
+                console.log(`[Scrape] Run iniciado: ${runData.id} (dataset: ${runData.defaultDatasetId})`);
 
-                // clean:true skips hidden #debug / #error records (see Apify dataset docs)
-                const { items: rawItems } = await apifyClient.dataset(run.defaultDatasetId).listItems({ clean: true });
+                res.writeHead(202, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    pending: true,
+                    runId: runData.id,
+                    datasetId: runData.defaultDatasetId,
+                    username,
+                    message: `Run iniciado para @${username}`
+                }));
+            } catch (err) {
+                console.error('[Scrape] Error:', err);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+        });
+        return;
+    }
 
-                // Filter to real post items only (must have ownerUsername or username)
+    // ── GET /api/fetch-run ────────────────────────────────────────────
+    // Checks Apify run status. If SUCCEEDED, fetches dataset items and
+    // upserts profile + posts into Supabase.
+    // Query params: runId, datasetId, username
+    if (req.url.startsWith('/api/fetch-run') && req.method === 'GET') {
+        if (!supabase) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Supabase no configurado en .env' }));
+            return;
+        }
+        if (!process.env.APIFY_TOKEN) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'APIFY_TOKEN no configurado en .env' }));
+            return;
+        }
+
+        const parsedFetchUrl = url.parse(req.url, true);
+        const { runId, datasetId, username: fetchUsername } = parsedFetchUrl.query;
+
+        if (!runId || !datasetId || !fetchUsername) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Faltan parámetros: runId, datasetId, username' }));
+            return;
+        }
+
+        (async () => {
+            try {
+                // 1. Check run status
+                const statusRes = await fetch(
+                    `https://api.apify.com/v2/actor-runs/${runId}`,
+                    { headers: { 'Authorization': `Bearer ${process.env.APIFY_TOKEN}` } }
+                );
+                if (!statusRes.ok) throw new Error(`Apify status error ${statusRes.status}`);
+                const { data: runData } = await statusRes.json();
+                const status = runData.status;
+                console.log(`[FetchRun] Run ${runId} status: ${status}`);
+
+                // Still running — tell browser to keep polling
+                if (status === 'RUNNING' || status === 'READY' || status === 'CREATED') {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ pending: true, status }));
+                    return;
+                }
+
+                // Terminal failure
+                if (status !== 'SUCCEEDED') {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ failed: true, status, error: `Run terminó con estado: ${status}` }));
+                    return;
+                }
+
+                // 2. Fetch dataset items (clean=true strips hidden #debug/#error records)
+                console.log(`[FetchRun] Run SUCCEEDED. Fetching dataset ${datasetId}...`);
+                const datasetRes = await fetch(
+                    `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&format=json`,
+                    { headers: { 'Authorization': `Bearer ${process.env.APIFY_TOKEN}` } }
+                );
+                if (!datasetRes.ok) throw new Error(`Apify dataset error ${datasetRes.status}`);
+                const rawItems = await datasetRes.json();
+
+                // Filter valid items (must have ownerUsername or username)
                 const items = (rawItems || []).filter(item =>
                     (item.ownerUsername && item.ownerUsername.trim()) ||
                     (item.username && item.username.trim())
                 );
+                if (!items.length) throw new Error('El actor no retornó datos válidos');
 
-                console.log(`[Scrape] Items recibidos de Apify: ${(rawItems || []).length} total, ${items.length} válidos`);
-
-                if (items.length === 0) {
-                    throw new Error(`Apify no retornó posts válidos para @${username}. Items crudos: ${(rawItems || []).length}`);
-                }
-
-                // 2.3 Parse profile and posts from Apify response.
-                // instagram-post-scraper (Format B): each item IS a post with ownerUsername.
-                // instagram-scraper (Format A): items[0] is a profile object with latestPosts.
+                // 3. Determine format and build profileToInsert
                 const firstItem = items[0];
-
-                // Log the keys of the first item to help debug format detection
-                console.log('[Scrape] Apify item[0] keys:', Object.keys(firstItem).slice(0, 20).join(', '));
-
+                const isPostFormat = firstItem.ownerUsername != null && firstItem.ownerUsername !== '';
                 let profileToInsert;
                 let latestPosts;
 
-                // Detect format: Format B has ownerUsername, Format A has latestPosts / no ownerUsername
-                const isPostFormat = firstItem.ownerUsername != null && firstItem.ownerUsername !== '';
-
                 if (isPostFormat) {
-                    // Format B — instagram-post-scraper: each item is a post, profile info is on the item
-                    console.log('[Scrape] Formato B: POSTS individuales (ownerUsername:', firstItem.ownerUsername, ')');
+                    // Format B: instagram-post-scraper — each item is a post
                     profileToInsert = {
                         username: firstItem.ownerUsername,
                         full_name: firstItem.ownerFullName || firstItem.fullName || '',
@@ -449,10 +519,9 @@ const requestHandler = (req, res) => {
                         ig_url: firstItem.inputUrl || `https://www.instagram.com/${firstItem.ownerUsername}/`,
                         scraped_at: new Date().toISOString()
                     };
-                    latestPosts = items; // items themselves are the posts
+                    latestPosts = items;
                 } else {
-                    // Format A — instagram-scraper: items[0] is profile with nested latestPosts
-                    console.log('[Scrape] Formato A: PERFIL con latestPosts anidados (username:', firstItem.username, ')');
+                    // Format A: instagram-scraper — first item is the profile object
                     profileToInsert = {
                         username: firstItem.username,
                         full_name: firstItem.fullName || '',
@@ -463,148 +532,59 @@ const requestHandler = (req, res) => {
                         profile_pic: firstItem.profilePicUrl || '',
                         is_verified: firstItem.isVerified || false,
                         external_url: firstItem.externalUrl || '',
-                        ig_url: firstItem.url || `https://www.instagram.com/${firstItem.username}/`,
+                        ig_url: firstItem.igUrl || `https://www.instagram.com/${firstItem.username}/`,
                         scraped_at: new Date().toISOString()
                     };
                     latestPosts = firstItem.latestPosts || [];
                 }
 
-                if (!profileToInsert.username) {
-                    const sample = JSON.stringify(firstItem).slice(0, 300);
-                    throw new Error(
-                        `No se pudo determinar el username del perfil. ` +
-                        `Formato detectado: ${isPostFormat ? 'B(posts)' : 'A(profile)'}. ` +
-                        `Keys: ${Object.keys(firstItem).join(', ')}. Sample: ${sample}`
-                    );
-                }
-
-                // 2.4 Upsert profile first to get its DB id
-                const { data: upsertedProfile, error: profileErr } = await supabase
+                // 4. Upsert profile
+                console.log(`[FetchRun] Upserting profile: @${profileToInsert.username}`);
+                const { data: profileData, error: profileError } = await supabase
                     .from('profiles')
                     .upsert(profileToInsert, { onConflict: 'username' })
                     .select('id')
                     .single();
+                if (profileError) throw profileError;
+                const profileId = profileData.id;
 
-                if (profileErr) throw profileErr;
-                const profileId = upsertedProfile.id;
-                console.log(`[Scrape] Perfil guardado: @${profileToInsert.username} (ID: ${profileId})`);
+                // 5. Upsert posts
+                if (latestPosts.length > 0) {
+                    const postsToInsert = latestPosts.map(post => ({
+                        profile_id: profileId,
+                        ig_post_id: String(post.id || ''),
+                        type: post.type || 'Image',
+                        caption: post.caption || '',
+                        post_url: post.url || '',
+                        display_url: post.displayUrl || '',
+                        likes_count: post.likesCount || 0,
+                        comments_count: post.commentsCount || 0,
+                        video_views: post.videoViewCount ?? null,
+                        published_at: post.timestamp || null,
+                        hashtags: post.hashtags || [],
+                        mentions: post.mentions || [],
+                        scraped_at: new Date().toISOString()
+                    }));
 
-                // Map posts to match the exact Supabase posts table schema
-                const postsToInsert = latestPosts.map(post => ({
-                    profile_id: profileId,
-                    ig_post_id: String(post.id || ''),
-                    type: post.type || 'Image',
-                    caption: post.caption || '',
-                    post_url: post.url || '',
-                    display_url: post.displayUrl || '',
-                    likes_count: post.likesCount || 0,
-                    comments_count: post.commentsCount || 0,
-                    video_views: post.videoViewCount ?? null,
-                    published_at: post.timestamp || null,
-                    hashtags: post.hashtags || [],
-                    mentions: post.mentions || [],
-                    scraped_at: new Date().toISOString()
-                }));
-
-                if (postsToInsert.length > 0) {
-                    const { error: postsErr } = await supabase
+                    const { error: postsError } = await supabase
                         .from('posts')
                         .upsert(postsToInsert, { onConflict: 'ig_post_id' });
-                    if (postsErr) throw postsErr;
-                }
-
-                console.log(`[Scrape] ${postsToInsert.length} posts guardados para @${username}`);
-
-                // 2.5 Auto-sync images in background (reuses activeSyncs tracker)
-                if (!activeSyncs.has(username)) {
-                    activeSyncs.set(username, {
-                        running: true,
-                        total: postsToInsert.length + 1,
-                        done: 0,
-                        failed: 0,
-                        phase: 'Iniciando...'
-                    });
-
-                    (async () => {
-                        const state = activeSyncs.get(username);
-                        try {
-                            // Sync profile pic
-                            state.phase = 'Foto de perfil';
-                            if (profileToInsert.profile_pic && !profileToInsert.profile_pic.includes('supabase.co')) {
-                                try {
-                                    const imgRes = await fetch(profileToInsert.profile_pic);
-                                    if (imgRes.ok) {
-                                        const buf = Buffer.from(await imgRes.arrayBuffer());
-                                        const { error } = await supabase.storage.from('instaviz-media').upload(
-                                            `profiles/${profileId}.jpg`, buf,
-                                            { contentType: imgRes.headers.get('content-type') || 'image/jpeg', upsert: true }
-                                        );
-                                        if (!error) {
-                                            const newUrl = supabase.storage.from('instaviz-media').getPublicUrl(`profiles/${profileId}.jpg`).data.publicUrl;
-                                            await supabase.from('profiles').update({ profile_pic: newUrl }).eq('id', profileId);
-                                            state.done++;
-                                        } else { state.failed++; }
-                                    } else { state.failed++; }
-                                } catch { state.failed++; }
-                            }
-
-                            // Sync post thumbnails
-                            state.phase = 'Posts';
-                            const { data: dbPosts } = await supabase
-                                .from('posts').select('id, display_url').eq('profile_id', profileId);
-
-                            if (dbPosts) {
-                                for (const post of dbPosts) {
-                                    if (!post.display_url || post.display_url.includes('supabase.co')) {
-                                        state.done++;
-                                        continue;
-                                    }
-                                    try {
-                                        const imgRes = await fetch(post.display_url);
-                                        if (!imgRes.ok) { state.failed++; continue; }
-                                        const buf = Buffer.from(await imgRes.arrayBuffer());
-                                        const { error } = await supabase.storage.from('instaviz-media').upload(
-                                            `posts/${post.id}.jpg`, buf,
-                                            { contentType: imgRes.headers.get('content-type') || 'image/jpeg', upsert: true }
-                                        );
-                                        if (!error) {
-                                            const newUrl = supabase.storage.from('instaviz-media').getPublicUrl(`posts/${post.id}.jpg`).data.publicUrl;
-                                            await supabase.from('posts').update({ display_url: newUrl }).eq('id', post.id);
-                                            state.done++;
-                                        } else { state.failed++; }
-                                    } catch { state.failed++; }
-                                }
-                            }
-
-                            state.phase = 'Completado';
-                            state.running = false;
-                            console.log(`[Scrape] Imágenes sincronizadas para @${username}. ✅ ${state.done} guardadas, ❌ ${state.failed} fallidas.`);
-                        } catch (err) {
-                            console.error('[Scrape] Error en sync de imágenes:', err);
-                            if (activeSyncs.has(username)) {
-                                activeSyncs.get(username).running = false;
-                                activeSyncs.get(username).phase = 'Error: ' + err.message;
-                            }
-                        } finally {
-                            setTimeout(() => activeSyncs.delete(username), 60000);
-                        }
-                    })();
+                    if (postsError) throw postsError;
+                    console.log(`[FetchRun] ${postsToInsert.length} posts upserted for @${profileToInsert.username}`);
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     success: true,
-                    username,
-                    profileId,
-                    postsCount: postsToInsert.length,
-                    message: `Scraping completado para @${username}`
+                    username: profileToInsert.username,
+                    postsCount: latestPosts.length
                 }));
             } catch (err) {
-                console.error('[Scrape] Error:', err);
+                console.error('[FetchRun] Error:', err);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: err.message }));
             }
-        });
+        })();
         return;
     }
 

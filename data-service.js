@@ -114,28 +114,61 @@ const DataService = (() => {
     }
 
     /**
-     * Trigger scraping nativo via /api/start-scrape (Apify SDK en backend).
-     * La llamada es síncrona: retorna cuando los datos YA están en Supabase.
+     * Trigger scraping nativo via /api/start-scrape (async Apify run).
+     * Fires the run immediately (< 2s), then polls /api/fetch-run every 5s
+     * until the run succeeds or fails. Compatible con Vercel Hobby (60s limit).
      */
     async function triggerScrape(profileUrl, postsLimit = 10) {
         // Extract bare username from a full Instagram URL or plain username
         const match = profileUrl.match(/instagram\.com\/([^/?#]+)/);
         const username = match ? match[1] : profileUrl.replace(/\//g, '');
 
-        const response = await fetch('/api/start-scrape', {
+        // Step 1: fire the async Apify run — returns in < 2s
+        const startResponse = await fetch('/api/start-scrape', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, postsLimit }),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Error HTTP ${response.status}`);
+        if (!startResponse.ok) {
+            const errorData = await startResponse.json();
+            throw new Error(errorData.error || `Error HTTP ${startResponse.status}`);
         }
 
-        // Data is already in Supabase — invalidate cache so next load is fresh
-        clearCache();
-        return response.json();
+        const { runId, datasetId } = await startResponse.json();
+        console.log(`[DataService] Run iniciado: ${runId}. Comenzando polling...`);
+
+        // Step 2: poll /api/fetch-run every 5s until done (max 2 minutes)
+        const MAX_ATTEMPTS = 24; // 24 × 5s = 120s
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            await new Promise(r => setTimeout(r, 5000));
+
+            const pollRes = await fetch(
+                `/api/fetch-run?runId=${encodeURIComponent(runId)}&datasetId=${encodeURIComponent(datasetId)}&username=${encodeURIComponent(username)}`
+            );
+
+            if (!pollRes.ok) {
+                const errData = await pollRes.json().catch(() => ({}));
+                throw new Error(errData.error || `Error HTTP ${pollRes.status}`);
+            }
+
+            const result = await pollRes.json();
+
+            if (result.pending) {
+                console.log(`[DataService] Run pendiente (intento ${attempt}/${MAX_ATTEMPTS})...`);
+                continue;
+            }
+
+            if (result.failed || !result.success) {
+                throw new Error(result.error || 'El run de Apify falló');
+            }
+
+            // success — data is now in Supabase
+            clearCache();
+            return result;
+        }
+
+        throw new Error('Timeout: el scraping tardó más de 2 minutos');
     }
 
     /**
