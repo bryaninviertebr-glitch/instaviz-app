@@ -4,7 +4,7 @@
 
 La división de responsabilidades es la siguiente:
 - **Frontend InstaViz** → Interfaz de usuario construida en HTML, CSS y Vanilla JS (con bibliotecas visuales como Plotly y html2pdf). Actúa como un CRM ligero, visualizador de datos y generador de reportes conectado a **Supabase**.
-- **Orquestador (n8n)** → Recibe webhooks del frontend, ejecuta el scraping asíncrono/síncrono, guarda los resultados en **Supabase** y devuelve la confirmación.
+- **Backend Vercel (server.js)** → Orquesta el scraping mediante un patrón de "Async Polling", llama a la API de Apify de forma directa, procesa los resultados y los guarda en **Supabase**. También gestiona los "Grupos de Negocio" y la eliminación de datos.
 - **Motor de Scraping (Apify)** → Ejecuta el Actor oficial (`apify/instagram-scraper`) para extraer data pura de perfiles comerciales.
 
 ---
@@ -26,8 +26,7 @@ La división de responsabilidades es la siguiente:
 | **Backend / Proxy** | Node.js (`server.js`), Express | Actúa como middleware local, gestiona el archivo `business-groups.json` y sirve como endpoint de eliminación en base de datos. Sirve localmente sobre Vercel. |
 | **Integración DB (Frontend)** | `@supabase/supabase-js` (CDN) | Lectura directa del historial, perfiles y datos analíticos. |
 | **Proxy de Imágenes** | `wsrv.nl` | Bypass avanzado de las restricciones CORS y expiración de CDN de Meta/Instagram para que las imágenes nunca dejen de cargar. |
-| **Orquestación** | n8n (Webhook) | Valida schemas y realiza los upserts a base de datos protegiendo credenciales sensibles. |
-| **Scraping** | Apify API v2 | Actor oficial: `apify/instagram-scraper`. |
+| **Orquestación y Scraping** | Apify API v2 | Actor oficial: `apify/instagram-scraper`. Integrado directamente en el backend mediante Async Polling para evitar Timeouts en Vercel. |
 | **Base de datos** | Supabase (PostgreSQL) | Almacenamiento relacional de `profiles` y `posts`. |
 
 ---
@@ -44,24 +43,26 @@ flowchart TD
         W["Proxy Inyección (wsrv.nl)"]
     end
 
-    subgraph NodeBackend["Backend Local / Vercel Edge (server.js)"]
+    subgraph NodeBackend["Backend Local / Vercel Serverless (server.js)"]
         K["/api/groups (CRUD de grupos)"]
         L["/api/delete-profile"]
+        M["/api/start-scrape (Lanza Apify)"]
+        N["/api/fetch-run (Async Polling & Upsert)"]
     end
 
-    subgraph n8n["n8n (Backend Extractor)"]
-        B["Webhook: POST /webhook/scrape"]
-        C["Validar & Sanitizar"]
-        D["Nodo Apify: Run Actor"]
-        E["Nodo Supabase: Bulk Upsert"]
+    subgraph Apify["Apify (Motor Extractor)"]
+        D["Run Actor: instagram-scraper"]
     end
 
     subgraph Supabase["Supabase"]
         DB[("PostgreSQL")]
     end
 
-    A -->|"1. POST request"| B
-    B --> C --> D --> E -->|"Upsert Data"| DB
+    A -->|"1. POST /api/start-scrape"| M
+    M -->|"2. POST /runs"| D
+    A -.->|"3. GET /api/fetch-run (Polling 5s)"| N
+    N -.->|"4. Check Status"| D
+    N -->|"5. Si SUCCEEDED: Extraer Dataset & Upsert"| DB
     H -->|"Procesa URLs de imagen"| W
     W -->|"Petición proxificada"| H
     I -->|"Lee historial y posts"| DB
@@ -100,7 +101,10 @@ Se ha implementado un servidor Node.js que maneja el almacenamiento persistente 
 - **Endpoint:** `DELETE /api/delete-profile`
 - **Función:** Elimina el rastreo total de una cuenta auditada desde Supabase usando el Service Role Key. Elimina automáticamente de forma segura todos sus posts en base a la restricción en cascada.
 
----
+### 6.3 Orquestación de Scraping (Async Polling)
+Para evitar los límites de tiempo de ejecución de las Serverless Functions (ej. Vercel corta peticiones largas a los 10 o 60 segundos), se implementa un patrón de "Async Polling" en dos fases:
+- **Fase 1 (`POST /api/start-scrape`):** El frontend solicita el scraping. El backend llama a Apify para iniciar una "Run" y devuelve inmediatamente el `runId` al frontend (toma < 2s).
+- **Fase 2 (`GET /api/fetch-run`):** El frontend realiza un *polling* cada 5 segundos pidiendo el estado de la "Run". El backend consulta a Apify. Si sigue corriendo, devuelve `{ pending: true }`. Si terminó con éxito (`SUCCEEDED`), el backend extrae el Dataset limpio, detecta el formato de salida, procesa los datos y realiza un "Upsert" a Supabase.
 
 ## 7. Funcionalidades del Frontend (InstaViz)
 
@@ -119,10 +123,8 @@ La interfaz se divide en 3 módulos principales:
 ### A. Proxy Dinámico de Imágenes (Evitar 403 Forbidden)
 Las URLs de imágenes de Instagram caducan y bloquean CORS. El Frontend re-procesa dinámicamente cada URL de imagen interceptando `app.js` y `report.js` a través del servicio proxy público `wsrv.nl`. Si este falla, implementa un fallback a un SVG visual ("Image Unavailable") para garantizar que la UI nunca se vea rota.
 
-### B. Bulk Upsert Híbrido en n8n
-El flujo de n8n maneja dos "ramas" condicionales usando el nodo Switch:
-- Actualización de perfil (`Format A` en Apify).
-- Inserción y actualización masiva de posts (`Format B` en Apify).
+### B. Scraping Serverless mediante Async Polling
+Se descartó el uso de herramientas externas de orquestación (como n8n) por una solución en código (Express/Vercel) basada en "Async Polling". Esto resuelve nativamente las limitaciones de "Gateway Timeouts" (504) de las plataformas Serverless cuando los scrapings toman minutos en completarse. El Frontend gestiona el estado visual realizando consultas cada 5 segundos hasta recibir la confirmación de guardado en la Base de Datos.
 
 ### C. Fallback Visual y Animación DOM
 Se optimizaron todas las tarjetas visuales (posts y filas de historia) para utilizar Glassmorphism. Las interacciones de eliminación no recargan la página; ejecutan la API en silent failover ocultando mediante CSS transitions el nodo del DOM tras éxito, manteniendo la memoria baja sin re-renderizar la grilla de Plotly.
@@ -133,8 +135,8 @@ Se optimizaron todas las tarjetas visuales (posts y filas de historia) para util
 
 - **Frontend Variables (en `config.js`):**
     - `SUPABASE_URL` y `SUPABASE_ANON_KEY`: Proveen acceso delegado. Si se requiere RLS (Row Level Security), la UI solo tendrá permisos de `SELECT`.
-    - `WEBHOOK_URL`: Apuntando a n8n para gatillar scraping en caliente.
-- **Backend Node.js (`server.js` | `.env`):**
-    - `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: Permisos administrativos para borrados en red.
+- **Backend Node.js (`server.js` | Variables Entorno de Vercel):**
+    - `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: Permisos administrativos para borrados en red y Upserts masivos provenientes de Apify.
+    - `APIFY_TOKEN`: Token de autenticación para la API de Apify.
 - **Despliegue:** 
     - Listo para configurarse como un proyecto estático en Vercel, ejecutando \`npm start\` con motor Node habilitado.
